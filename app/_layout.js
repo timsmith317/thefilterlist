@@ -16,7 +16,11 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="filter/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="filter/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="filter/edit/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'card' }} />
+        <Stack.Screen name="settings/parts" options={{ presentation: 'card' }} />
+        <Stack.Screen name="part/[id]" options={{ presentation: 'card' }} />
+        <Stack.Screen name="part/new" options={{ presentation: 'modal' }} />
       </Stack>
     </SafeAreaProvider>
   );
