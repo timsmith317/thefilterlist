@@ -1,8 +1,6 @@
 // app/filter/[id].js — Filter Detail.
-// - Stronger "Back" button (big chevron + label).
-// - "Mark Replaced" opens a native date picker (default today, no future dates).
-// - Part row is a tappable card → Part Detail; shows on-hand and low-stock badge.
-// - Edit button (top right) → Edit Filter (reuses /filter/new with edit mode).
+// Edit button uses the pill style. Back button has tight text spacing.
+// Hint text simplified.
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
@@ -10,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../theme/theme';
-import { TypeIcon, IconBack } from '../../theme/Icons';
+import { TypeIcon } from '../../theme/Icons';
+import { BackButton, PillButton } from '../../components/HeaderBits';
 import {
   loadData, saveData, statusOf, markReplaced, deleteFilter, getPart, isPartLow,
   FILTER_TYPES,
@@ -35,10 +34,7 @@ export default function FilterDetail() {
   if (!f) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={8}>
-          <IconBack size={26} color={t.ink} />
-          <Text style={s.backTxt}>Back</Text>
-        </Pressable>
+        <View style={s.head}><BackButton onPress={() => router.back()} /><View /></View>
         <Text style={{ color: t.ink, marginTop: 20, padding: 22 }}>Filter not found.</Text>
       </SafeAreaView>
     );
@@ -52,12 +48,8 @@ export default function FilterDetail() {
   const fmt = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   const onPickDate = async (_event, date) => {
-    // iOS: this fires whenever the spinner changes. We close on confirm via the
-    // overlay button. To keep behavior simple/cross-platform, save when date
-    // arrives and close. (User can cancel by tapping outside on iOS.)
     if (!date) { setPickerOpen(false); return; }
     setPickerOpen(false);
-    // Disallow future dates defensively (picker is also constrained by maximumDate)
     const safe = date > new Date() ? new Date() : date;
     const next = markReplaced(data, f.id, safe.toISOString());
     setData(next);
@@ -73,17 +65,12 @@ export default function FilterDetail() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={10}>
-          <IconBack size={26} color={t.ink} />
-          <Text style={s.backTxt}>Back</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push(`/filter/edit/${f.id}`)} hitSlop={10}>
-          <Text style={s.editTxt}>Edit</Text>
-        </Pressable>
+        <BackButton onPress={() => router.back()} />
+        <PillButton label="Edit" onPress={() => router.push(`/filter/edit/${f.id}`)} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40 }}>
-        <View style={s.bigChip}><TypeIcon type={f.type} size={34} color={t.iconInk} /></View>
+        <View style={s.bigChip}><TypeIcon type={f.type} size={36} color={t.iconInk} /></View>
         <Text style={s.title}>{f.name}</Text>
         <View style={[s.pill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start', marginTop: 8 }]}>
           <Text style={[s.pillTxt, { color: tone.pillInk }]}>{status.label}</Text>
@@ -97,7 +84,6 @@ export default function FilterDetail() {
           <Row t={t} k="Next due" v={fmt(status.due)} last />
         </View>
 
-        {/* Part card — tappable to open Part Detail; shows on-hand and low-stock badge */}
         <Text style={s.sectionLabel}>PART</Text>
         {part ? (
           <Pressable style={s.partCard} onPress={() => router.push(`/part/${part.id}`)}>
@@ -122,7 +108,7 @@ export default function FilterDetail() {
         <Pressable style={s.bigBtn} onPress={() => setPickerOpen(true)}>
           <Text style={s.bigBtnTxt}>✓ Mark Replaced</Text>
         </Pressable>
-        <Text style={s.hint}>Tap to choose the install date (default today, no future dates).</Text>
+        <Text style={s.hint}>Tap to choose the install date.</Text>
 
         <Pressable style={s.delBtn} onPress={onDelete}>
           <Text style={s.delTxt}>Delete filter</Text>
@@ -155,11 +141,8 @@ function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 },
-    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 8, paddingVertical: 6 },
-    backTxt: { color: t.ink, fontSize: 16, fontWeight: '600' },
-    editTxt: { color: t.ink, fontSize: 15, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6 },
 
-    bigChip: { width: 64, height: 64, borderRadius: 16, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+    bigChip: { width: 68, height: 68, borderRadius: 16, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
     title: { ...t.type.title, fontSize: 28, color: t.ink, marginTop: 14 },
 
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },

@@ -1,12 +1,12 @@
-// app/settings/parts.js — Parts inventory listed under Settings.
-// All parts with on-hand counts and low-stock badges. Tap to view/edit.
+// app/settings/parts.js — Parts inventory under Settings.
+// Removed SETTINGS kicker. + Add uses the pill style matching Settings/Edit.
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
-import { IconBack } from '../../theme/Icons';
+import { BackButton, PillButton } from '../../components/HeaderBits';
 import { loadData, partsList, isPartLow, filtersUsingPart } from '../../data/store';
 
 export default function PartsInventory() {
@@ -29,14 +29,11 @@ export default function PartsInventory() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={10}>
-          <IconBack size={26} color={t.ink} /><Text style={s.backTxt}>Back</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/part/new')} hitSlop={10}><Text style={s.addTxt}>+ Add</Text></Pressable>
+        <BackButton onPress={() => router.back()} />
+        <PillButton label="+ Add" onPress={() => router.push('/part/new')} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
-        <Text style={s.kicker}>SETTINGS</Text>
         <Text style={s.title}>Parts Inventory</Text>
         <Text style={s.sub}>
           {parts.length === 0
@@ -71,14 +68,8 @@ function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 },
-    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 8, paddingVertical: 6 },
-    backTxt: { color: t.ink, fontSize: 16, fontWeight: '600' },
-    addTxt: { color: t.ink, fontSize: 15, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6 },
-
-    kicker: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 8 },
     title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4 },
     sub: { fontSize: 13, color: t.muted, marginTop: 4 },
-
     row: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 12, padding: 14, marginBottom: 10, gap: 10 },
     rowName: { fontSize: 15, fontWeight: '600', color: t.ink },
     rowMeta: { fontSize: 12, color: t.muted, marginTop: 3 },

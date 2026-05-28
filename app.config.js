@@ -1,11 +1,6 @@
 /**
  * app.config.js — dynamic Expo config for The Filter List.
- * Mirrors the Hanger pattern: APP_VARIANT (set per EAS profile in eas.json)
- * selects the Bundle ID and display name so dev / preview / production can
- * coexist on the same device.
- *
- * Appearance: automatic light/dark. The design-token module defines both
- * palettes; the system setting selects which is active.
+ * Mirrors the Hanger pattern via APP_VARIANT.
  */
 const variant = process.env.APP_VARIANT;
 const IS_DEV = variant === 'development';
@@ -44,9 +39,11 @@ export default {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription:
-          'The Filter List uses the camera so you can snap a reference photo of a filter.',
+          'The Filter List uses the camera so you can snap a reference photo of a filter or part.',
         NSPhotoLibraryUsageDescription:
-          'The Filter List can attach a photo from your library as a filter reference.',
+          'The Filter List can attach photos from your library as part references.',
+        NSPhotoLibraryAddUsageDescription:
+          'The Filter List can save reference photos to your Photos library.',
       },
     },
     android: {

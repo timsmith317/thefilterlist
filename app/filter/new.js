@@ -1,11 +1,11 @@
-// app/filter/new.js — Add a new filter.
-// Now uses partId (optional) instead of the old reorderUrl text field.
+// app/filter/new.js — Add a new filter. Save uses the pill style.
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
+import { PillButton } from '../../components/HeaderBits';
 import { loadData, saveData, addFilter, FILTER_TYPES, partsList } from '../../data/store';
 
 export default function NewFilter() {
@@ -48,7 +48,7 @@ export default function NewFilter() {
       <View style={s.head}>
         <Pressable onPress={() => router.back()} hitSlop={10}><Text style={s.link}>Cancel</Text></Pressable>
         <Text style={s.kicker}>NEW FILTER</Text>
-        <Pressable onPress={onSave} hitSlop={10}><Text style={[s.link, { color: t.ink, fontWeight: '700' }]}>Save</Text></Pressable>
+        <PillButton label="Save" primary onPress={onSave} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 22 }}>
@@ -105,7 +105,7 @@ export default function NewFilter() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 12 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 6 },
     link: { color: t.inkSoft, fontSize: 15 },
     kicker: { ...t.type.kicker, color: t.ink, textTransform: 'uppercase' },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 18, marginBottom: 8 },
