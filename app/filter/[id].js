@@ -1,15 +1,19 @@
 // app/filter/[id].js — Filter Detail.
-// Edit button uses the pill style. Back button has tight text spacing.
-// Hint text simplified.
+//
+// Mark Replaced button restyled:
+//   - Grey background (matches pill style elsewhere)
+//   - Inset with marginHorizontal: 16 so its edges align with the title text
+//     above (which sits at paddingLeft: 16 inside the paddingHorizontal: 18
+//     page padding), not the wider data rows card.
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../theme/theme';
 import { TypeIcon } from '../../theme/Icons';
 import { BackButton, PillButton } from '../../components/HeaderBits';
+import DatePickerModal from '../../components/DatePickerModal';
 import {
   loadData, saveData, statusOf, markReplaced, deleteFilter, getPart, isPartLow,
   FILTER_TYPES,
@@ -28,14 +32,15 @@ export default function FilterDetail() {
     return () => { active = false; };
   }, []));
 
+  const s = makeStyles(t);
+
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
   const f = data.filters.find(x => x.id === id);
-  const s = makeStyles(t);
   if (!f) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.head}><BackButton onPress={() => router.back()} /><View /></View>
-        <Text style={{ color: t.ink, marginTop: 20, padding: 22 }}>Filter not found.</Text>
+        <Text style={{ color: t.ink, padding: 22 }}>Filter not found.</Text>
       </SafeAreaView>
     );
   }
@@ -47,12 +52,11 @@ export default function FilterDetail() {
   const partLow = isPartLow(part);
   const fmt = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const onPickDate = async (_event, date) => {
-    if (!date) { setPickerOpen(false); return; }
-    setPickerOpen(false);
+  const onConfirmDate = async (date) => {
     const safe = date > new Date() ? new Date() : date;
     const next = markReplaced(data, f.id, safe.toISOString());
     setData(next);
+    setPickerOpen(false);
     await saveData(next);
   };
 
@@ -69,10 +73,10 @@ export default function FilterDetail() {
         <PillButton label="Edit" onPress={() => router.push(`/filter/edit/${f.id}`)} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40 }}>
-        <View style={s.bigChip}><TypeIcon type={f.type} size={36} color={t.iconInk} /></View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40, paddingTop: 4 }}>
+        <View style={s.bigChip}><TypeIcon type={f.type} size={52} color={t.iconInk} /></View>
         <Text style={s.title}>{f.name}</Text>
-        <View style={[s.pill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start', marginTop: 8 }]}>
+        <View style={[s.pill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start', marginTop: 8, marginLeft: 16 }]}>
           <Text style={[s.pillTxt, { color: tone.pillInk }]}>{status.label}</Text>
         </View>
 
@@ -84,46 +88,43 @@ export default function FilterDetail() {
           <Row t={t} k="Next due" v={fmt(status.due)} last />
         </View>
 
-        <Text style={s.sectionLabel}>PART</Text>
-        {part ? (
-          <Pressable style={s.partCard} onPress={() => router.push(`/part/${part.id}`)}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.partName} numberOfLines={1}>{part.name || 'Untitled part'}</Text>
-              {!!part.sku && <Text style={s.partMeta}>SKU: {part.sku}</Text>}
-              <View style={s.partStockRow}>
-                <Text style={s.partStock}>On hand: {part.onHand}</Text>
-                {partLow && (
-                  <View style={s.lowPill}><Text style={s.lowPillTxt}>Low stock</Text></View>
-                )}
+        {part && (
+          <>
+            <Text style={s.sectionLabel}>PART</Text>
+            <Pressable style={s.partCard} onPress={() => router.push(`/part/${part.id}`)}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.partName} numberOfLines={1}>{part.name || 'Untitled part'}</Text>
+                {!!part.sku && <Text style={s.partMeta}>SKU: {part.sku}</Text>}
+                <View style={s.partStockRow}>
+                  <Text style={s.partStock}>On hand: {part.onHand}</Text>
+                  {partLow && (
+                    <View style={s.lowPill}><Text style={s.lowPillTxt}>Low stock</Text></View>
+                  )}
+                </View>
               </View>
-            </View>
-            <Text style={s.chev}>›</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={s.partAddCard} onPress={() => router.push(`/part/new?filterId=${f.id}`)}>
-            <Text style={s.partAddTxt}>+ Add a part for reorder tracking</Text>
-          </Pressable>
+              <Text style={s.chev}>›</Text>
+            </Pressable>
+          </>
         )}
 
-        <Pressable style={s.bigBtn} onPress={() => setPickerOpen(true)}>
-          <Text style={s.bigBtnTxt}>✓ Mark Replaced</Text>
+        <Pressable style={s.markBtn} onPress={() => setPickerOpen(true)}>
+          <Text style={s.markBtnTxt}>✓ Mark Replaced</Text>
         </Pressable>
         <Text style={s.hint}>Tap to choose the install date.</Text>
 
         <Pressable style={s.delBtn} onPress={onDelete}>
-          <Text style={s.delTxt}>Delete filter</Text>
+          <Text style={s.delTxt}>Delete Filter</Text>
         </Pressable>
       </ScrollView>
 
-      {pickerOpen && (
-        <DateTimePicker
-          value={new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          maximumDate={new Date()}
-          onChange={onPickDate}
-        />
-      )}
+      <DatePickerModal
+        visible={pickerOpen}
+        initialDate={new Date()}
+        maximumDate={new Date()}
+        title="Install date"
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={onConfirmDate}
+      />
     </SafeAreaView>
   );
 }
@@ -140,17 +141,17 @@ function Row({ t, k, v, last }) {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
 
-    bigChip: { width: 68, height: 68, borderRadius: 16, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-    title: { ...t.type.title, fontSize: 28, color: t.ink, marginTop: 14 },
+    bigChip: { width: 76, height: 76, borderRadius: 18, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginLeft: 16 },
+    title: { ...t.type.title, fontSize: 28, color: t.ink, marginTop: 14, paddingLeft: 16 },
 
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },
 
     rows: { marginTop: 22, backgroundColor: t.card, borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: t.line },
 
-    sectionLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8 },
+    sectionLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
     partCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14 },
     partName: { fontSize: 15, fontWeight: '700', color: t.ink },
     partMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
@@ -159,11 +160,11 @@ function makeStyles(t) {
     lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
     chev: { fontSize: 22, color: t.muted, marginLeft: 8 },
-    partAddCard: { backgroundColor: t.card, borderWidth: 1, borderStyle: 'dashed', borderColor: t.iconBorder, borderRadius: 14, padding: 16, alignItems: 'center' },
-    partAddTxt: { color: t.inkSoft, fontSize: 14, fontWeight: '600' },
 
-    bigBtn: { marginTop: 22, backgroundColor: t.btnBg, padding: 16, borderRadius: t.radius.btn, alignItems: 'center' },
-    bigBtnTxt: { ...t.type.btn, color: t.btnInk },
+    // Grey button, inset 16 on each side so edges align with the title text
+    // above (title sits at paddingLeft: 16 inside paddingHorizontal: 18 page).
+    markBtn: { marginTop: 22, marginHorizontal: 16, backgroundColor: t.tabIdleBg, padding: 14, borderRadius: t.radius.btn, alignItems: 'center' },
+    markBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
     hint: { fontSize: 12, color: t.muted, marginTop: 8, textAlign: 'center' },
 
     delBtn: { marginTop: 22, padding: 12, alignItems: 'center' },

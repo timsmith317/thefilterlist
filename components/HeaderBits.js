@@ -1,6 +1,8 @@
 // components/HeaderBits.js — reusable header pieces.
-// BackButton: < chevron with text nudged tight against it.
-// PillButton: grey-pill style matching the Settings pill (used for Add, Edit, Save).
+// BackButton: tight (but not too tight) chevron-to-text spacing.
+// PillButton: SINGLE grey pill style — used for Settings, +Add, Edit, Save.
+// (The previous `primary` variant has been removed for a unified visual
+// language; if callers still pass `primary`, it's safely ignored.)
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
@@ -18,27 +20,26 @@ export function BackButton({ onPress, label = 'Back' }) {
   );
 }
 
-// Grey pill action button matching the Settings pill style.
-// Optional `icon` prop renders a leading icon component.
-export function PillButton({ onPress, label, icon, primary = false }) {
+// PillButton — single grey style. The `primary` prop is accepted but ignored
+// to keep existing callers working without crashing during the transition.
+export function PillButton({ onPress, label, icon, primary }) {
   const t = useTheme();
   const s = makeStyles(t);
   return (
-    <Pressable style={[s.pill, primary && s.pillPrimary]} onPress={onPress} hitSlop={8}>
+    <Pressable style={s.pill} onPress={onPress} hitSlop={8}>
       {icon ? <View style={{ marginRight: 5 }}>{icon}</View> : null}
-      <Text style={[s.pillTxt, primary && s.pillTxtPrimary]}>{label}</Text>
+      <Text style={s.pillTxt}>{label}</Text>
     </Pressable>
   );
 }
 
 function makeStyles(t) {
   return StyleSheet.create({
-    back: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 },
-    // gap removed; use marginLeft on the text for tighter, controlled spacing.
+    back: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+    // Chevron-to-text margin: -2 gives a comfortable but tight gap.
+    // (Was -6 in pass 3, which Tim found too tight.)
     backTxt: { color: t.ink, fontSize: 16, fontWeight: '600', marginLeft: -2 },
     pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, backgroundColor: t.tabIdleBg },
-    pillPrimary: { backgroundColor: t.btnBg },
     pillTxt: { fontSize: 12.5, fontWeight: '600', color: t.inkSoft },
-    pillTxtPrimary: { color: t.btnInk, fontWeight: '700' },
   });
 }

@@ -1,5 +1,8 @@
-// app/settings/parts.js — Parts inventory under Settings.
-// Removed SETTINGS kicker. + Add uses the pill style matching Settings/Edit.
+// app/settings/parts.js — Parts Inventory.
+//
+// Same alignment principle as Settings: chevron at x=18 (card edge),
+// title indented to line up with card interior text.
+// (Card padding is 14 here, vs 16 in Settings, hence the different indent.)
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
@@ -30,7 +33,7 @@ export default function PartsInventory() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <BackButton onPress={() => router.back()} />
-        <PillButton label="+ Add" onPress={() => router.push('/part/new')} />
+        <PillButton label="Add" onPress={() => router.push('/part/new')} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
@@ -67,9 +70,10 @@ export default function PartsInventory() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 },
-    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
+    // Title indented by card's interior padding (14) to align with card text.
+    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 14 },
+    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 14 },
     row: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 12, padding: 14, marginBottom: 10, gap: 10 },
     rowName: { fontSize: 15, fontWeight: '600', color: t.ink },
     rowMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
