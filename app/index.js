@@ -1,19 +1,9 @@
-// app/index.js — Due Soon.
-//
-// =================================================================
-//   TUNING KNOBS — tweak these, save, hot-reload to see changes
-// =================================================================
-//
-//   LOCKUP_NUDGE: shift the logo+wordmark lockup left/right.
-//     Positive = right, negative = left, 0 = mathematically centered.
-//
 //   WORDMARK_COLOR: the color of "The Filter List" text.
-//     Try sage greens: '#7c9885' (soft sage), '#6b8e6f' (deeper),
-//     '#869f77' (olive-sage), '#9caf88' (light sage).
-//     Or keep near-black with '#0f172a'.
+//     Forest green '#15803d' to match logo, near-black '#0f172a' for neutral,
+//     or sage greens like '#7c9885' for softer tone.
 //
 const LOCKUP_NUDGE = -8;
-const WORDMARK_COLOR = '#0f172a'; // soft sage green
+const WORDMARK_COLOR = '#15803d'; // soft sage green
 // =================================================================
 
 import React, { useState, useCallback } from 'react';
@@ -27,7 +17,7 @@ import {
   loadData, dueSoonList, filtersForCategory, dueCount,
 } from '../data/store';
 
-const LOGO_SIZE = 42;
+const LOGO_SIZE = 50;
 
 export default function DueSoon() {
   const t = useTheme();
@@ -51,7 +41,7 @@ export default function DueSoon() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={[s.brandRow, { transform: [{ translateX: LOCKUP_NUDGE }] }]}>
-        <View style={s.logoBox}><LogoMark size={28} color="#0f172a" /></View>
+        <View style={s.logoBox}><LogoMark size={44} color={t.ink} /></View>
         <Wordmark color={WORDMARK_COLOR} size={26} />
       </View>
 
@@ -111,17 +101,17 @@ function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
     brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: t.space.lg, paddingBottom: t.space.sm, paddingHorizontal: t.space.lg },
-    logoBox: { width: LOGO_SIZE, height: LOGO_SIZE, borderRadius: t.radius.chip, backgroundColor: '#dcfce7', borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+    logoBox: { width: LOGO_SIZE, height: LOGO_SIZE, borderRadius: t.radius.chip, backgroundColor: t.bg, borderWidth: 2, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
 
-    titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: t.space.xl, paddingTop: t.space.lg, paddingBottom: 2 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 32, paddingRight: 18, paddingTop: t.space.lg, paddingBottom: 2 },
     title: { fontSize: 20, fontWeight: '700', color: t.ink, letterSpacing: 0.2 },
     settingsWrap: { paddingTop: 5 },
     settings: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, backgroundColor: t.tabIdleBg },
     settingsTxt: { fontSize: 12.5, fontWeight: '600', color: t.inkSoft },
-    sub: { fontSize: 13, color: t.muted, paddingHorizontal: t.space.xl, paddingBottom: 4 },
+    sub: { fontSize: 13, color: t.muted, paddingHorizontal: 32, paddingBottom: 4 },
 
     tabsWrap: { flexGrow: 0 },
-    tabs: { paddingHorizontal: t.space.xl, paddingVertical: t.space.sm, gap: t.space.sm },
+    tabs: { paddingHorizontal: t.space.lg, paddingVertical: t.space.sm, gap: t.space.sm },
     tab: { paddingHorizontal: t.space.lg, paddingVertical: 7, borderRadius: t.radius.md, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.line, marginRight: t.space.sm },
     tabOn: { backgroundColor: t.tabIdleBg },
     tabTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },

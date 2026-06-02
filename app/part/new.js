@@ -1,7 +1,11 @@
 // app/part/new.js — New Part.
 // Modal page padding (clears iOS modal chrome edge). Title indented 16 to
 // match Settings. Field labels indented 13 to align with input text inside
-// each input box (input has padding: 13 so its text starts at x=page+13).
+// each input box.
+//
+// When opened via filterId param (from the Part picker on Edit Filter), the
+// newly-created part is linked to that filter AND its id is stored in the
+// pendingPart shared state so Edit Filter can auto-select it on return.
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
@@ -12,6 +16,7 @@ import { PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
 import { loadData, saveData, addPart, updateFilter, MAX_PART_PHOTOS } from '../../data/store';
 import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/partPhotos';
+import { setPendingPart } from '../../lib/pendingPart';
 
 export default function NewPart() {
   const t = useTheme();
@@ -46,6 +51,8 @@ export default function NewPart() {
     const newPart = next.parts[next.parts.length - 1];
     if (filterId) next = updateFilter(next, filterId, { partId: newPart.id });
     await saveData(next);
+    // Signal Edit Filter to auto-select the new part on focus return.
+    if (filterId) setPendingPart(newPart.id);
     router.back();
   };
 
@@ -101,7 +108,6 @@ export default function NewPart() {
         <Text style={s.hint}>You'll get a low-stock alert when on-hand reaches this number.</Text>
 
         <Text style={s.label}>PHOTOS</Text>
-        {/* Photo strip wrapped so its left edge aligns with input text */}
         <View style={{ paddingLeft: 13 }}>
           <PhotoStrip
             photos={photos}
@@ -126,7 +132,6 @@ function makeStyles(t) {
     cancel: { color: t.inkSoft, fontSize: 15 },
     title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
     sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
-    // Labels indented to align with text inside the input field (input has padding: 13)
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
     input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
     hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 13 },

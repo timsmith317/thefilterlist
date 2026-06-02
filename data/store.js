@@ -54,7 +54,13 @@ function seed() {
       { id: 'f6', assetId: 'a_office', name: 'Office HVAC',         type: 'air',   intervalDays: 90,  lastReplaced: iso(81),  partId: 'p_merv8',  photo: null },
     ],
     settings: {
-      reminders: { leadDays: 7, channels: { push: true, sms: false, email: false } },
+      reminders: {
+        enabled: false,
+        leadDays: 30,
+        extraReminders: [7],
+        timeOfDay: '09:00',
+        channels: { push: true, sms: false, email: false },
+      },
       lowStockAlerts: true,
     },
   };
@@ -80,6 +86,25 @@ function migrateV1toV2(v1) {
   return next;
 }
 
+// Fill in any missing reminder sub-fields with defaults. Runs on every load
+// so users with older data (no `enabled`, no `extraReminders`, etc.) get the
+// new fields silently, preserving any values they had set.
+function migrateReminders(data) {
+  if (!data) return data;
+  const r = (data.settings && data.settings.reminders) || {};
+  const reminders = {
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : false,
+    leadDays: typeof r.leadDays === 'number' ? r.leadDays : 30,
+    extraReminders: Array.isArray(r.extraReminders) ? r.extraReminders.slice(0, 1) : [7],
+    timeOfDay: typeof r.timeOfDay === 'string' && /^\d{1,2}:\d{2}$/.test(r.timeOfDay) ? r.timeOfDay : '09:00',
+    channels: r.channels || { push: true, sms: false, email: false },
+  };
+  return {
+    ...data,
+    settings: { ...(data.settings || {}), reminders },
+  };
+}
+
 export async function loadData() {
   try {
     const v2 = await AsyncStorage.getItem(KEY);
@@ -87,12 +112,12 @@ export async function loadData() {
       const parsed = JSON.parse(v2);
       // Defensive: ensure parts have photos:[] (covers users who saved before this field existed)
       if (parsed.parts) parsed.parts = parsed.parts.map(p => ({ ...p, photos: p.photos || [] }));
-      return parsed;
+      return migrateReminders(parsed);
     }
     const v1raw = await AsyncStorage.getItem(LEGACY_KEY_V1);
     if (v1raw) {
       const v1 = JSON.parse(v1raw);
-      const migrated = migrateV1toV2(v1);
+      const migrated = migrateReminders(migrateV1toV2(v1));
       await saveData(migrated);
       return migrated;
     }
@@ -105,6 +130,13 @@ export async function loadData() {
 export async function saveData(data) {
   try { await AsyncStorage.setItem(KEY, JSON.stringify(data)); }
   catch (e) { console.warn('saveData failed', e); }
+  // Auto-resync local notifications after every save. Dynamic import so the
+  // notifications module loads lazily and any failure (missing native module,
+  // permission revoked, etc.) is silent so it can't break a normal save.
+  try {
+    const { syncFilterNotifications } = await import('../lib/notifications');
+    await syncFilterNotifications(data);
+  } catch (e) { /* silent */ }
 }
 
 export async function resetToSeed() {
@@ -229,5 +261,21 @@ export function removePartPhoto(data, partId, index) {
       const next = (p.photos || []).filter((_, i) => i !== index);
       return { ...p, photos: next };
     }),
+  };
+}
+
+// Settings helpers — shallow merge into settings or settings.reminders.
+// Used by Settings screens that need to update specific sub-fields without
+// re-passing the whole settings object.
+export function updateSettings(data, patch) {
+  return { ...data, settings: { ...(data.settings || {}), ...patch } };
+}
+export function updateReminders(data, patch) {
+  return {
+    ...data,
+    settings: {
+      ...(data.settings || {}),
+      reminders: { ...((data.settings || {}).reminders || {}), ...patch },
+    },
   };
 }
