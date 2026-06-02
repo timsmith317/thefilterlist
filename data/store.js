@@ -279,3 +279,164 @@ export function updateReminders(data, patch) {
     },
   };
 }
+// ============================================================================
+// CATEGORIES — paste this block at the END of data/store.js, after the existing
+// updateReminders() function. These are new helpers; nothing above changes.
+// ============================================================================
+
+// Hardcoded protected ids: the seeded categories. Users cannot rename or
+// delete these. Adding/removing categories changes data.categories but never
+// touches these three.
+export const PROTECTED_CATEGORY_IDS = ['home', 'auto', 'work'];
+
+// Reserved id for the auto-created fallback category when a deleted category
+// has assets. Not in PROTECTED_CATEGORY_IDS because it's renameable — but it's
+// non-deletable since it's the orphan destination.
+export const UNCATEGORIZED_ID = 'uncategorized';
+
+export function canRenameCategory(id) {
+  return !PROTECTED_CATEGORY_IDS.includes(id);
+}
+
+export function canDeleteCategory(id) {
+  return !PROTECTED_CATEGORY_IDS.includes(id) && id !== UNCATEGORIZED_ID;
+}
+
+// Number of LIVE (non-archived) assets currently referencing a category.
+export function assetsInCategory(data, categoryId) {
+  return (data.assets || []).filter(
+    a => a.categoryId === categoryId && !a.archived
+  ).length;
+}
+
+// Add a new category. Trims and ignores empty names. Caps at MAX_CATEGORIES.
+// Returns unchanged data if the cap is reached so callers don't need to
+// re-check.
+export function addCategory(data, name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return data;
+  const cats = data.categories || [];
+  if (cats.length >= MAX_CATEGORIES) return data;
+  const maxOrder = cats.reduce((m, c) => Math.max(m, c.order || 0), -1);
+  const id = 'cat_' + Date.now();
+  return {
+    ...data,
+    categories: [...cats, { id, name: trimmed, order: maxOrder + 1 }],
+  };
+}
+
+// Rename a category. Blocks rename of protected (Home/Auto/Work). Returns
+// unchanged data on no-op / invalid input rather than throwing.
+export function renameCategory(data, id, name) {
+  if (!canRenameCategory(id)) return data;
+  const trimmed = (name || '').trim();
+  if (!trimmed) return data;
+  return {
+    ...data,
+    categories: (data.categories || []).map(c =>
+      c.id === id ? { ...c, name: trimmed } : c
+    ),
+  };
+}
+
+// Delete a category. If any assets reference it, those assets are moved to
+// the Uncategorized fallback (auto-created if it doesn't yet exist). Blocks
+// delete of protected and of Uncategorized itself.
+export function deleteCategory(data, id) {
+  if (!canDeleteCategory(id)) return data;
+
+  let categories = data.categories || [];
+  let assets = data.assets || [];
+
+  // Are any assets (live OR archived) referencing this category? We move
+  // archived ones too so nothing ends up pointing at a deleted category id.
+  const orphaned = assets.filter(a => a.categoryId === id);
+
+  if (orphaned.length > 0) {
+    // Ensure the Uncategorized category exists. If the user previously
+    // renamed it, that's preserved.
+    if (!categories.some(c => c.id === UNCATEGORIZED_ID)) {
+      const maxOrder = categories.reduce((m, c) => Math.max(m, c.order || 0), -1);
+      categories = [
+        ...categories,
+        { id: UNCATEGORIZED_ID, name: 'Uncategorized', order: maxOrder + 1 },
+      ];
+    }
+    // Move orphans
+    assets = assets.map(a =>
+      a.categoryId === id ? { ...a, categoryId: UNCATEGORIZED_ID } : a
+    );
+  }
+
+  // Remove the deleted category
+  categories = categories.filter(c => c.id !== id);
+
+  return { ...data, categories, assets };
+}
+
+// Apply a new ordering. idsInOrder is an array of category ids in the new
+// desired sequence. Categories not in idsInOrder are appended at the end
+// preserving their relative order (defensive against partial reorderings).
+export function reorderCategories(data, idsInOrder) {
+  const cats = data.categories || [];
+  const byId = Object.fromEntries(cats.map(c => [c.id, c]));
+  const seen = new Set();
+  const reordered = [];
+
+  // First, items from idsInOrder that exist
+  idsInOrder.forEach((id, i) => {
+    if (byId[id]) {
+      reordered.push({ ...byId[id], order: i });
+      seen.add(id);
+    }
+  });
+
+  // Then, any remaining categories not in the new sequence
+  cats.forEach(c => {
+    if (!seen.has(c.id)) {
+      reordered.push({ ...c, order: reordered.length });
+    }
+  });
+
+  return { ...data, categories: reordered };
+}
+// ============================================================================
+// ASSET HELPERS — paste at the END of data/store.js, after reorderCategories().
+// ============================================================================
+
+// Generic asset patch — used by Settings → Assets to rename or recategorize.
+// Patch is shallow-merged onto the matched asset.
+export function updateAsset(data, assetId, patch) {
+  return {
+    ...data,
+    assets: (data.assets || []).map(a =>
+      a.id === assetId ? { ...a, ...patch } : a
+    ),
+  };
+}
+
+// All filters that reference a given asset (regardless of asset archive
+// state — the filters themselves remain in data when an asset is archived,
+// they just stop appearing in dueSoonList / filtersForCategory).
+export function filtersForAsset(data, assetId) {
+  return (data.filters || []).filter(f => f.assetId === assetId);
+}
+// ============================================================================
+// Append this at the END of data/store.js (after filtersForAsset).
+// ============================================================================
+
+// Permanently delete an asset AND all filters that reference it. Parts are
+// NOT touched here — they're shared across filters, so other filters may
+// still reference them. Any genuinely orphaned parts can be cleaned up
+// separately from Parts Inventory.
+//
+// Notifications scheduled for the asset's filters are auto-cancelled the
+// next time saveData() runs (which is the standard pattern after every
+// mutation in this app — saveData invokes syncFilterNotifications).
+export function deleteAsset(data, assetId) {
+  return {
+    ...data,
+    assets: (data.assets || []).filter(a => a.id !== assetId),
+    filters: (data.filters || []).filter(f => f.assetId !== assetId),
+  };
+}

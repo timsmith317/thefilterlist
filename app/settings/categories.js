@@ -14,6 +14,19 @@
 //   - No ScaleDecorator (renders flat during drag — feels better than
 //     the default lift-and-scale).
 //
+// Modal pattern:
+//   <Modal> → <View style={s.modalRoot}>  ← THIS gets the dim color
+//              <KeyboardAvoidingView>
+//                <Pressable style={s.backdrop} /> ← tap-to-dismiss only
+//                <View style={s.dialog}> ... </View>
+//              </KeyboardAvoidingView>
+//             </View>
+//           </Modal>
+//
+// modalRoot is a direct child of Modal with flex:1, so it reliably fills
+// the entire modal viewport. The dim color lives there, not on the
+// absolutely-positioned backdrop (which had screen-coverage issues).
+//
 // Protected (Home/Auto/Work) and Uncategorized rules:
 //   - Protected: no Edit button at all. Can still drag-reorder.
 //   - Uncategorized: Edit button shows, but the Edit modal hides the
@@ -41,15 +54,10 @@ export default function CategoriesSettings() {
   const t = useTheme();
   const router = useRouter();
   const [data, setData] = useState(null);
-  // Categories is held as its own state (separate from data) so drag-end can
-  // update the visual order immediately without waiting for the persist
-  // round-trip. Reseeded from data on every focus.
   const [categories, setCategories] = useState([]);
 
-  // Modals share a single `error` state since only one modal can be open at
-  // a time. nameInput is reused for both Add and Edit text fields.
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // category object or null
+  const [editing, setEditing] = useState(null);
   const [nameInput, setNameInput] = useState('');
   const [error, setError] = useState(null);
 
@@ -76,9 +84,6 @@ export default function CategoriesSettings() {
     await saveData(next);
   };
 
-  // ----- Reorder -----
-  // Update the visible order immediately on drop, defer the write to the
-  // next frame so the settle animation isn't fighting AsyncStorage.
   const onDragEnd = ({ data: newOrder }) => {
     setCategories(newOrder);
     requestAnimationFrame(() => {
@@ -88,7 +93,6 @@ export default function CategoriesSettings() {
     });
   };
 
-  // ----- Add -----
   const openAdd = () => {
     setNameInput('');
     setError(null);
@@ -112,7 +116,6 @@ export default function CategoriesSettings() {
     closeAdd();
   };
 
-  // ----- Edit (rename or delete) -----
   const openEdit = (cat) => {
     setEditing(cat);
     setNameInput(cat.name);
@@ -127,7 +130,7 @@ export default function CategoriesSettings() {
     if (!editing) return;
     const trimmed = nameInput.trim();
     if (!trimmed) { setError('Please enter a name.'); return; }
-    if (trimmed === editing.name) { closeEdit(); return; } // no-op
+    if (trimmed === editing.name) { closeEdit(); return; }
     const exists = (data.categories || []).some(
       c => c.id !== editing.id && c.name.toLowerCase() === trimmed.toLowerCase()
     );
@@ -156,9 +159,6 @@ export default function CategoriesSettings() {
     ]);
   };
 
-  // ----- Row -----
-  // Whole row is the long-press grab handle (Hanger pattern). The ≡ icon on
-  // the right is a visual hint, not the only place you can grab from.
   const renderRow = ({ item, drag, isActive }) => {
     const count = assetsInCategory(data, item.id);
     const renameable = canRenameCategory(item.id);
@@ -235,83 +235,87 @@ export default function CategoriesSettings() {
 
         {/* Add Category modal */}
         <Modal visible={addOpen} transparent animationType="fade" onRequestClose={closeAdd}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={s.overlay}
-          >
-            <Pressable style={s.backdrop} onPress={closeAdd} />
-            <View style={s.dialog}>
-              <Text style={s.dialogTitle}>Add Category</Text>
-              <Text style={s.dialogSub}>
-                {categories.length} of {MAX_CATEGORIES} categories
-              </Text>
-              <TextInput
-                style={s.input}
-                value={nameInput}
-                onChangeText={(v) => { setNameInput(v); if (error) setError(null); }}
-                placeholder="e.g. Garage"
-                placeholderTextColor={t.muted}
-                autoCapitalize="words"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={confirmAdd}
-                autoFocus
-              />
-              {!!error && <Text style={s.errorTxt}>{error}</Text>}
-              <View style={s.dialogActions}>
-                <Pressable onPress={closeAdd} style={s.btnSecondary}>
-                  <Text style={s.btnSecondaryTxt}>Cancel</Text>
-                </Pressable>
-                <Pressable onPress={confirmAdd} style={s.btnPrimary}>
-                  <Text style={s.btnPrimaryTxt}>Add</Text>
-                </Pressable>
+          <View style={s.modalRoot}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={s.overlay}
+            >
+              <Pressable style={s.backdrop} onPress={closeAdd} />
+              <View style={s.dialog}>
+                <Text style={s.dialogTitle}>Add Category</Text>
+                <Text style={s.dialogSub}>
+                  {categories.length} of {MAX_CATEGORIES} categories
+                </Text>
+                <TextInput
+                  style={s.input}
+                  value={nameInput}
+                  onChangeText={(v) => { setNameInput(v); if (error) setError(null); }}
+                  placeholder="e.g. Garage"
+                  placeholderTextColor={t.muted}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={confirmAdd}
+                  autoFocus
+                />
+                {!!error && <Text style={s.errorTxt}>{error}</Text>}
+                <View style={s.dialogActions}>
+                  <Pressable onPress={closeAdd} style={s.btnSecondary}>
+                    <Text style={s.btnSecondaryTxt}>Cancel</Text>
+                  </Pressable>
+                  <Pressable onPress={confirmAdd} style={s.btnPrimary}>
+                    <Text style={s.btnPrimaryTxt}>Add</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+          </View>
         </Modal>
 
         {/* Edit Category modal (rename + optional delete) */}
         <Modal visible={!!editing} transparent animationType="fade" onRequestClose={closeEdit}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={s.overlay}
-          >
-            <Pressable style={s.backdrop} onPress={closeEdit} />
-            <View style={s.dialog}>
-              <Text style={s.dialogTitle}>Edit Category</Text>
-              <Text style={s.dialogSub}>
-                Rename{canDelete ? ' or delete' : ''} this category.
-              </Text>
-              <TextInput
-                style={s.input}
-                value={nameInput}
-                onChangeText={(v) => { setNameInput(v); if (error) setError(null); }}
-                placeholder="Category name"
-                placeholderTextColor={t.muted}
-                autoCapitalize="words"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={confirmEdit}
-                autoFocus
-              />
-              {!!error && <Text style={s.errorTxt}>{error}</Text>}
-              <View style={s.dialogActions}>
-                <Pressable onPress={closeEdit} style={s.btnSecondary}>
-                  <Text style={s.btnSecondaryTxt}>Cancel</Text>
-                </Pressable>
-                <Pressable onPress={confirmEdit} style={s.btnPrimary}>
-                  <Text style={s.btnPrimaryTxt}>Save</Text>
-                </Pressable>
-              </View>
-              {canDelete && (
-                <View style={s.deleteSection}>
-                  <Pressable onPress={confirmDelete} style={s.deleteBtn}>
-                    <Text style={s.deleteTxt}>Delete Category</Text>
+          <View style={s.modalRoot}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={s.overlay}
+            >
+              <Pressable style={s.backdrop} onPress={closeEdit} />
+              <View style={s.dialog}>
+                <Text style={s.dialogTitle}>Edit Category</Text>
+                <Text style={s.dialogSub}>
+                  Rename{canDelete ? ' or delete' : ''} this category.
+                </Text>
+                <TextInput
+                  style={s.input}
+                  value={nameInput}
+                  onChangeText={(v) => { setNameInput(v); if (error) setError(null); }}
+                  placeholder="Category name"
+                  placeholderTextColor={t.muted}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={confirmEdit}
+                  autoFocus
+                />
+                {!!error && <Text style={s.errorTxt}>{error}</Text>}
+                <View style={s.dialogActions}>
+                  <Pressable onPress={closeEdit} style={s.btnSecondary}>
+                    <Text style={s.btnSecondaryTxt}>Cancel</Text>
+                  </Pressable>
+                  <Pressable onPress={confirmEdit} style={s.btnPrimary}>
+                    <Text style={s.btnPrimaryTxt}>Save</Text>
                   </Pressable>
                 </View>
-              )}
-            </View>
-          </KeyboardAvoidingView>
+                {canDelete && (
+                  <View style={s.deleteSection}>
+                    <Pressable onPress={confirmDelete} style={s.deleteBtn}>
+                      <Text style={s.deleteTxt}>Delete Category</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            </KeyboardAvoidingView>
+          </View>
         </Modal>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -356,11 +360,19 @@ function makeStyles(t) {
     addBtnDim: { opacity: 0.5 },
     addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
 
+    // Modal root: direct child of <Modal>, flex:1, carries the dim. This is
+    // the element we know reliably fills the modal viewport.
+    modalRoot: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
     overlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+    backdrop: { ...StyleSheet.absoluteFillObject }, // tap-to-dismiss only
     dialog: {
       width: '85%', maxWidth: 360,
-      backgroundColor: t.bg, borderRadius: 14, padding: 18,
+      backgroundColor: t.card, borderRadius: 14, padding: 18,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.22,
+      shadowRadius: 16,
+      elevation: 10,
     },
     dialogTitle: { fontSize: 18, fontWeight: '700', color: t.ink, marginBottom: 4 },
     dialogSub: { fontSize: 12, color: t.muted, marginBottom: 14 },

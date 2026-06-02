@@ -11,13 +11,14 @@ import Svg, { Path, Circle, Rect, G, Defs, Mask } from 'react-native-svg';
 import { useTheme } from './theme';
 
 // ----- LogoMark -----
-// Three stacked filter-frame shapes. The two rear frames are fixed brand
-// green (#15803d). The front frame uses the passed color (defaults to
-// t.ink) so it adapts to light/dark mode.
+// Three stacked filter-frame shapes. The two rear frames are brand-green
+// (now via t.brand, theme-aware: #15803d in light, #4ade80 in dark). The
+// front frame uses the passed color (defaults to t.ink) so it stays
+// readable on either background.
 export function LogoMark({ size = 24, color }) {
   const t = useTheme();
   const ink = color || t.ink;
-  const greenStroke = '#15803d';
+  const greenStroke = t.brand;
   return (
     <Svg width={size} height={size} viewBox="0 0 1024 1024">
       <Path fill={greenStroke} d="M568.36,125.899v93.922l-54.105,31.288V143.634c0-5.411-4.208-7.815-8.717-5.11L203.751,312.864 c-11.423,6.913-15.932,12.324-15.932,27.353v348.075c0,4.812,3.006,6.915,7.815,4.212l94.083-54.271v63.827l-71.839,41.543 c-48.095,27.651-83.864,9.316-83.864-48.693V338.413c0-35.77,11.422-55.308,42.684-73.643L489.607,84.118 C525.377,63.678,568.36,77.806,568.36,125.899z"/>
@@ -38,14 +39,6 @@ export function LogoMark({ size = 24, color }) {
 //
 // useId() gives each instance a unique mask ID, so multiple humidity icons
 // on the same screen don't conflict.
-//
-// To swap to the "drop.degreesign" SF Symbol instead, replace the whole
-// Svg body with the single path version below and update viewBox to
-// "0 -85 105 95":
-//
-//   <Svg width={size} height={size} viewBox="0 -85 105 95">
-//     <Path fill={ink} d="M33.7891 3.85742C49.9512 3.85742 60.7422-6.68945 60.7422-22.4609C60.7422-30.4688 57.6172-38.1836 55.6641-42.6758C51.5625-52.0508 44.9707-62.4023 39.3555-70.9961C37.8906-73.1934 36.1816-74.4629 33.7891-74.4629C31.3477-74.4629 29.6875-73.1934 28.2715-70.9961C22.6562-62.4023 16.0156-52.0508 11.9141-42.6758C9.96094-38.1836 6.83594-30.4688 6.83594-22.4609C6.83594-6.68945 17.627 3.85742 33.7891 3.85742ZM33.7891-3.27148C21.875-3.27148 13.9648-10.9375 13.9648-22.4609C13.9648-28.9062 16.4062-34.8145 18.2617-39.2578C22.6562-49.6094 28.3203-57.7148 33.6426-65.6738C33.7402-65.8691 33.8867-65.8691 33.9844-65.6738C39.2578-57.7148 45.0195-49.6094 49.2676-39.2578C51.123-34.8145 53.6133-28.9062 53.6133-22.4609C53.6133-10.9375 45.7031-3.27148 33.7891-3.27148ZM61.9141-60.0098C68.75-60.0098 74.1211-65.332 74.1211-72.168C74.1211-79.0527 68.75-84.375 61.9141-84.375C55.0781-84.375 49.707-79.0527 49.707-72.168C49.707-65.332 55.0781-60.0098 61.9141-60.0098ZM61.9141-66.1133C58.4961-66.1133 55.8594-68.7988 55.8594-72.168C55.8594-75.5859 58.4961-78.2715 61.9141-78.2715C65.332-78.2715 68.0176-75.5859 68.0176-72.168C68.0176-68.7988 65.332-66.1133 61.9141-66.1133Z"/>
-//   </Svg>
 //
 // IMPORTANT: SF Symbols are licensed for in-app use within iOS apps. Don't
 // use them in marketing, app icons, or merchandise.
@@ -87,7 +80,7 @@ export function IconAir({ size = 32, color }) {
   );
 }
 
-// ----- IconOther (unchanged — rounded square with divider) -----
+// ----- IconOther — rounded square with divider -----
 export function IconOther({ size = 30, color }) {
   const t = useTheme();
   const ink = color || t.iconInk || t.ink;
@@ -99,20 +92,29 @@ export function IconOther({ size = 30, color }) {
   );
 }
 
-// ----- IconGear (unchanged) -----
-export function IconGear({ size = 14, color = '#475569' }) {
+// ----- IconGear -----
+// Now theme-aware. Default stroke uses t.inkSoft so the gear reads as a
+// secondary control rather than a primary one. Callers can still pass an
+// explicit `color` to override.
+export function IconGear({ size = 14, color }) {
+  const t = useTheme();
+  const stroke = color || t.inkSoft;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="12" cy="12" r="3" />
       <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </Svg>
   );
 }
 
-// ----- IconBack (unchanged) -----
-export function IconBack({ size = 26, color = '#0f172a' }) {
+// ----- IconBack -----
+// Now theme-aware. Default stroke uses t.ink so it reads as a primary
+// navigation control. Callers can pass `color` to override.
+export function IconBack({ size = 26, color }) {
+  const t = useTheme();
+  const stroke = color || t.ink;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M15 18 L9 12 L15 6" />
     </Svg>
   );

@@ -1,26 +1,37 @@
-// app/settings.js — Settings hub. Each row Pressable; rows with a route push
-// to the corresponding screen. Rows without a built screen yet show a brief
-// "coming soon" alert so taps aren't silent dead ends.
+// app/settings.js — Settings hub.
+//
+// Layout pattern matches the subscreens (Reminders, Categories, Parts):
+//   - <BackButton> at top-left
+//   - Big title below (canonical 26/800/0.5 via t.type.screenTitle)
+//   - Subtitle (13pt, muted)
+//   - Stack of bordered cards, each linking to a subscreen
+//
+// Cards link via `route`. If route is null, the row is a not-yet-built stub:
+// it renders WITHOUT a chevron and shows a brief "coming soon" alert on tap.
+// The footnote at the bottom explains the chevron convention to the user.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
+import { BackButton } from '../components/HeaderBits';
 
 export default function Settings() {
   const t = useTheme();
   const router = useRouter();
   const s = makeStyles(t);
 
-  // route: where this row links. If null, row is a not-yet-built stub.
+  // Row order matches the Preview app design (Reminders → Categories →
+  // Assets → Parts → Backup → About). Built rows have a route; unbuilt
+  // rows have route:null and render without a chevron.
   const rows = [
-    { k: 'reminders',  label: 'Reminders',         desc: 'Notifications and lead time', route: '/settings/reminders' },
-    { k: 'parts',      label: 'Parts Inventory',   desc: 'Manage shared parts',         route: '/settings/parts' },
-    { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',    route: null },
-    { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive', route: null },
-    { k: 'backup',     label: 'Backup & Restore',  desc: 'Export / import your data',   route: null },
-    { k: 'about',      label: 'About',             desc: 'The Filter List',             route: null },
+    { k: 'reminders',  label: 'Reminders',         desc: 'Push notifications, lead time',     route: '/settings/reminders' },
+    { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',          route: '/settings/categories' },
+    { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive',       route: '/settings/assets' },
+    { k: 'parts',      label: 'Parts Inventory',   desc: 'Track on-hand stock and reorders',  route: '/settings/parts' },
+    { k: 'backup',     label: 'Backup & Restore',  desc: 'Export / import your data',         route: '/settings/backup' },
+    { k: 'about',      label: 'About',             desc: 'The Filter List',                   route: '/settings/about' },
   ];
 
   const onPress = (row) => {
@@ -31,30 +42,31 @@ export default function Settings() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={s.back}>{'\u2039 Done'}</Text>
-        </Pressable>
-        <Text style={s.title}>Settings</Text>
-        <View style={{ width: 50 }} />
+        <BackButton onPress={() => router.back()} />
+        <View />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 18 }}>
-        {rows.map((r, i) => (
-          <Pressable
-            key={r.k}
-            style={({ pressed }) => [
-              s.row,
-              i !== rows.length - 1 && s.rowDivider,
-              pressed && s.rowPressed,
-            ]}
-            onPress={() => onPress(r)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>{r.label}</Text>
-              <Text style={s.rowDesc}>{r.desc}</Text>
-            </View>
-            <Text style={s.chev}>{'\u203A'}</Text>
-          </Pressable>
-        ))}
+
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Text style={s.title}>Settings</Text>
+        <Text style={s.sub}>Configure reminders, categories, parts, and backups.</Text>
+
+        <View style={s.cards}>
+          {rows.map((r) => (
+            <Pressable
+              key={r.k}
+              style={({ pressed }) => [s.card, pressed && s.cardPressed]}
+              onPress={() => onPress(r)}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.cardLabel}>{r.label}</Text>
+                <Text style={s.cardDesc}>{r.desc}</Text>
+              </View>
+              {r.route && <Text style={s.chev}>{'\u203A'}</Text>}
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={s.footnote}>Sections without a chevron are coming next.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -63,21 +75,46 @@ export default function Settings() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
+
+    // Matches subscreens: BackButton sits in a slim head row at top-left.
     head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 22, paddingBottom: 10,
+      paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
-    back: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 17, fontWeight: '700', color: t.ink },
 
-    row: {
-      flexDirection: 'row', alignItems: 'center',
-      paddingVertical: 14, paddingHorizontal: 4,
+    scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+
+    // Canonical screen title — 26/800/0.5 via t.type.screenTitle. Same
+    // token as Due Soon, Filter detail, and every other screen header.
+    title: {
+      ...t.type.screenTitle, color: t.ink,
+      marginTop: 4, paddingLeft: 16,
     },
-    rowDivider: { borderBottomWidth: 1, borderBottomColor: t.line },
-    rowPressed: { backgroundColor: t.tabIdleBg, borderRadius: 8 },
-    rowLabel: { fontSize: 16, color: t.ink, fontWeight: '600' },
-    rowDesc:  { fontSize: 13, color: t.muted, marginTop: 2 },
-    chev: { fontSize: 22, color: t.muted, paddingHorizontal: 6 },
+    sub: {
+      fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16,
+      marginBottom: 22, lineHeight: 18,
+    },
+
+    cards: {},
+
+    // Card metrics align with the row pattern used in reminders.js
+    // (paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, etc.)
+    // but with a touch more vertical room since each card has two lines.
+    card: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderRadius: 12, borderWidth: 1.5, borderColor: t.line,
+      backgroundColor: t.card,
+      marginBottom: 10,
+    },
+    cardPressed: { backgroundColor: t.tabIdleBg },
+    cardLabel: { fontSize: 16, fontWeight: '700', color: t.ink },
+    cardDesc:  { fontSize: 13, color: t.muted, marginTop: 3 },
+    chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
+
+    footnote: {
+      fontSize: 12, color: t.muted, marginTop: 14, paddingLeft: 16,
+      fontStyle: 'italic',
+    },
   });
 }

@@ -30,6 +30,12 @@ const LIGHT = {
   ink: '#0f172a',          // near-black — primary text & accents
   inkSoft: '#475569',
   muted: '#94a3b8',
+
+  // Brand identity — used by the wordmark, logo, and any screen element
+  // that should carry the brand tone (e.g., the About title). Same value
+  // as the "grn" status pill ink, intentionally — green is the brand.
+  brand: '#15803d',
+
   // icon chip: white fill, grey outline, dark glyph
   iconBg: '#ffffff',
   iconBorder: '#94a3b8',
@@ -54,6 +60,12 @@ const DARK = {
   ink: '#f1f5f9',          // light text
   inkSoft: '#cbd5e1',
   muted: '#7c8aa0',
+
+  // Brand identity — brighter green for dark mode contrast. Matches the
+  // dark-theme grn pill ink so the brand reads consistently against the
+  // dark canvas.
+  brand: '#4ade80',
+
   iconBg: '#1c2740',
   iconBorder: '#3a4a66',
   iconInk: '#cbd5e1',
@@ -71,16 +83,22 @@ export const type = {
   // System font for now. To use Inter later: set fontFamily to 'Inter_xxx'
   // and load via expo-font; everything else stays.
   fontFamily: undefined, // undefined = system font (San Francisco on iOS)
-  kicker:    { fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  title:     { fontSize: 30, fontWeight: '800', letterSpacing: 0.5 },
-  titleSm:   { fontSize: 22, fontWeight: '800', letterSpacing: 0.2 },
-  body:      { fontSize: 15, fontWeight: '600' },
-  meta:      { fontSize: 12, fontWeight: '500' },
-  pill:      { fontSize: 11.5, fontWeight: '700' },
-  btn:       { fontSize: 15, fontWeight: '700' },
+  kicker:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  // Display title — large hero text. Available if a screen wants it.
+  title:       { fontSize: 30, fontWeight: '800', letterSpacing: 0.5 },
+  // Canonical screen title — what "Due Soon", "Settings", "Filter detail"
+  // and every other screen header should use. Spread it with the spread
+  // operator: `title: { ...t.type.screenTitle, color: t.ink, ... }`.
+  screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5 },
+  // Smaller title variant — for nested or secondary headers.
+  titleSm:     { fontSize: 22, fontWeight: '800', letterSpacing: 0.2 },
+  body:        { fontSize: 15, fontWeight: '600' },
+  meta:        { fontSize: 12, fontWeight: '500' },
+  pill:        { fontSize: 11.5, fontWeight: '700' },
+  btn:         { fontSize: 15, fontWeight: '700' },
 };
 
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 22, xxl: 28 };
+export const space  = { xs: 4, sm: 8, md: 12, lg: 16, xl: 22, xxl: 28 };
 export const radius = { sm: 6, md: 8, chip: 11, card: 12, pill: 6, btn: 11 };
 
 export function useTheme() {

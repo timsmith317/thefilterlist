@@ -144,7 +144,8 @@ function makeStyles(t) {
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
 
     bigChip: { width: 76, height: 76, borderRadius: 18, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginLeft: 16 },
-    title: { ...t.type.title, fontSize: 28, color: t.ink, marginTop: 14, paddingLeft: 16 },
+    // Canonical screen title — 26/800/0.5. Matches Settings, Due Soon, etc.
+    title: { ...t.type.screenTitle, color: t.ink, marginTop: 14, paddingLeft: 16 },
 
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },

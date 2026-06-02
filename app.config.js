@@ -61,6 +61,7 @@ export default {
       'expo-notifications',
       'expo-image-picker',
       'expo-file-system',
+      'expo-sharing',
     ],
     experiments: {
       typedRoutes: true,
