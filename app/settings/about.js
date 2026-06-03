@@ -48,7 +48,7 @@ const SUPPORT_URL = 'https://thefilterlist.app';
 // Easter egg config — tweak any of these to taste.
 const TAP_THRESHOLD            = 4;
 const TAP_RESET_MS             = 1500;
-const PARTICLE_COUNT           = 500;    // screen feels packed
+const PARTICLE_COUNT           = 700;    // screen feels packed
 const FIZZLE_DURATION_MS       = 400;    // each particle's pop-in time
 const FIZZLE_MAX_DELAY_MS      = 500;    // organic trickle-in stagger
 const VACUUM_START_MS          = 2400;   // long hold before the suck

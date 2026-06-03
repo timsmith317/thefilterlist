@@ -163,7 +163,7 @@ export default function BackupSettings() {
             disabled={exporting}
           >
             {exporting
-              ? <ActivityIndicator color={t.bg} />
+              ? <ActivityIndicator color={t.ink} />
               : <Text style={s.actionBtnPrimaryTxt}>Backup</Text>}
           </Pressable>
         </View>
@@ -235,7 +235,7 @@ export default function BackupSettings() {
                   disabled={restoring}
                 >
                   {restoring
-                    ? <ActivityIndicator color={t.bg} />
+                    ? <ActivityIndicator color={t.ink} />
                     : <Text style={s.btnPrimaryTxt}>Restore</Text>}
                 </Pressable>
               </View>
@@ -285,16 +285,20 @@ function makeStyles(t) {
     // Narrow, centered action buttons. alignSelf:'center' takes them out
     // of full-width stretch; minWidth: 200 + identical paddings give both
     // buttons the same chunky pill footprint regardless of label length.
+    // Backup is now grey-filled + bold black to match the app's standard
+    // buttons (Mark Replaced, Add, etc.).
     actionBtnPrimary: {
       marginTop: 28,
       alignSelf: 'center',
       paddingVertical: 12, paddingHorizontal: 28,
       minWidth: 200,
-      borderRadius: 10, backgroundColor: t.ink,
+      borderRadius: 10, backgroundColor: t.tabIdleBg,
       alignItems: 'center', minHeight: 44, justifyContent: 'center',
     },
-    actionBtnPrimaryTxt: { fontSize: 15, fontWeight: '700', color: t.bg },
+    actionBtnPrimaryTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
 
+    // Restore kept as the white-outline secondary for primary/secondary
+    // distinction next to Backup.
     actionBtnSecondary: {
       marginTop: 28,
       alignSelf: 'center',
@@ -341,11 +345,12 @@ function makeStyles(t) {
     },
     btnSecondary: { paddingVertical: 10, paddingHorizontal: 18 },
     btnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
+    // Grey fill + bold black to match the app's standard buttons.
     btnPrimary: {
       paddingVertical: 10, paddingHorizontal: 22,
-      borderRadius: 8, backgroundColor: t.ink,
+      borderRadius: 8, backgroundColor: t.tabIdleBg,
       minWidth: 88, alignItems: 'center', justifyContent: 'center',
     },
-    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.bg },
+    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
   });
 }

@@ -189,7 +189,7 @@ export default function RemindersSettings() {
       <TimePickerModal
         visible={timeOpen}
         initialTime={timeOfDay}
-        title="Notification time"
+        title="Notification Time"
         onCancel={() => setTimeOpen(false)}
         onConfirm={(hhmm) => { persist({ timeOfDay: hhmm }); setTimeOpen(false); }}
       />

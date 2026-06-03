@@ -7,16 +7,30 @@
 //   - "None (no part linked)" row
 //   - "+ Add new part" row → routes to /part/new with filterId so the new
 //     part links automatically; setPendingPart() carries the new id back
-//     so Edit Filter can auto-select it on focus return.
+//     so Edit Filter can auto-select it on return.
+//
+// Notes: a multiline NOTES field sits at the bottom, just above Delete Filter.
+// It's where filter notes are authored; the detail screen shows them read-only
+// (with a Copy button) when present.
+//
+// Delete Filter lives at the bottom of THIS screen (the edit screen), not
+// the detail screen — same pattern iOS Notes/Reminders use. Burying the
+// destructive action under "Edit" makes it discoverable without making it
+// a one-tap-away mistake from the view screen.
+//
+// Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
+// scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
+// in app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../../theme/theme';
 import { PillButton } from '../../../components/HeaderBits';
 import PickerSheet from '../../../components/PickerSheet';
-import { loadData, saveData, updateFilter, FILTER_TYPES, partsList } from '../../../data/store';
+import { loadData, saveData, updateFilter, deleteFilter, FILTER_TYPES, partsList } from '../../../data/store';
 import { consumePendingPart } from '../../../lib/pendingPart';
 
 export default function EditFilter() {
@@ -39,7 +53,7 @@ export default function EditFilter() {
       setData(d);
       if (!draft) {
         const f = d.filters.find(x => x.id === id);
-        if (f) setDraft({ ...f, interval: String(f.intervalDays) });
+        if (f) setDraft({ ...f, interval: String(f.intervalDays), notes: f.notes || '' });
       } else {
         const pending = consumePendingPart();
         if (pending) setDraft(prev => ({ ...prev, partId: pending }));
@@ -64,10 +78,39 @@ export default function EditFilter() {
       intervalDays: Math.max(1, parseInt(draft.interval, 10) || 90),
       assetId: draft.assetId,
       partId: draft.partId || null,
+      notes: (draft.notes || '').trim(),
     };
     const next = updateFilter(data, id, patch);
     await saveData(next);
     router.back();
+  };
+
+  // Delete with destructive confirmation. After delete we router.back()
+  // TWICE: once out of the edit screen, once out of the now-empty detail
+  // screen — landing the user back on Due Soon (or wherever they came
+  // from before the detail screen).
+  const askDelete = () => {
+    Alert.alert(
+      'Delete filter?',
+      `This will remove "${draft.name}" and its replacement history. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const next = deleteFilter(data, id);
+            await saveData(next);
+            // Back out of edit → detail. The detail screen will redirect
+            // away on its own next render since the filter no longer
+            // exists, OR pop again explicitly:
+            router.back();
+            // Slight delay so the first back() commits before the second.
+            setTimeout(() => router.back(), 0);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -79,7 +122,11 @@ export default function EditFilter() {
         <PillButton label="Save" onPress={save} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        bottomOffset={20}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.title}>Edit Filter</Text>
         <Text style={s.sub}>Change schedule, type, location, or linked part.</Text>
 
@@ -131,7 +178,27 @@ export default function EditFilter() {
           <Text style={s.chev}>›</Text>
         </Pressable>
         <Text style={s.hint}>Link a part to track stock and reorder info.</Text>
-      </ScrollView>
+
+        <Text style={s.label}>NOTES</Text>
+        <TextInput
+          style={s.notesInput}
+          value={draft.notes}
+          onChangeText={(v) => setDraft({ ...draft, notes: v })}
+          placeholder="Procurement details, install notes, model numbers…"
+          placeholderTextColor={t.muted}
+          multiline
+          textAlignVertical="top"
+        />
+        <Text style={s.hint}>Shown on the filter's detail screen with a copy button.</Text>
+
+        {/* Destructive action lives at the bottom of the Edit screen.
+            iOS Notes / Reminders / Contacts use this same pattern — burying
+            delete under Edit makes it discoverable without being a one-tap
+            mistake from view mode. */}
+        <Pressable style={s.delBtn} onPress={askDelete}>
+          <Text style={s.delTxt}>Delete Filter</Text>
+        </Pressable>
+      </KeyboardAwareScrollView>
 
       <PickerSheet
         visible={assetPickerOpen}
@@ -196,6 +263,13 @@ function makeStyles(t) {
       borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16,
     },
 
+    // Multiline notes — same visual weight as input, taller, top-aligned text.
+    notesInput: {
+      padding: 13, borderRadius: 10, borderWidth: 1.5,
+      borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16,
+      minHeight: 110, textAlignVertical: 'top',
+    },
+
     typeRow: { flexDirection: 'row', gap: 8 },
     typeChip: {
       flex: 1, alignItems: 'center', paddingVertical: 14,
@@ -217,5 +291,10 @@ function makeStyles(t) {
     chev: { fontSize: 22, color: t.muted },
 
     hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
+
+    // Destructive action at the bottom of the form. Same metrics that the
+    // Part detail uses for its (now edit-mode-only) Delete Part button.
+    delBtn: { marginTop: 28, padding: 12, alignItems: 'center' },
+    delTxt: { color: '#dc2626', fontSize: 14 },
   });
 }

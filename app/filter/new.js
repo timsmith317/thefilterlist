@@ -1,9 +1,14 @@
 // app/filter/new.js — New Filter.
 // Modal page: extra top padding to clear iOS modal chrome edge.
 // Title indented to match Settings/Edit Filter alignment.
+//
+// Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
+// scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
+// in app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
@@ -40,6 +45,7 @@ export default function NewFilter() {
       lastReplaced: new Date().toISOString(),
       partId: partId || null,
       photo: null,
+      notes: '',
     });
     await saveData(next);
     router.back();
@@ -52,7 +58,11 @@ export default function NewFilter() {
         <PillButton label="Save" onPress={onSave} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        bottomOffset={20}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.title}>New Filter</Text>
         <Text style={s.sub}>Set up a replacement schedule and link an optional part.</Text>
 
@@ -101,7 +111,7 @@ export default function NewFilter() {
           })}
         </View>
         <Text style={s.hint}>You can also create a new part from the filter detail later.</Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

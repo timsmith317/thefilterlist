@@ -2,11 +2,24 @@
 //
 // Pick a time of day, returns 'HH:MM' string on confirm.
 // Mirrors DatePickerModal but with mode="time" on the native picker.
+//
+// Animation strategy: see DatePickerModal for the full explanation. Short
+// version — Modal uses animationType="none" (dim is instant on/off), and
+// we animate only the sheet via Animated.View with translateY. An
+// internal `internalVisible` state keeps the Modal mounted through the
+// close animation, then unmounts.
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, Pressable, Modal, StyleSheet, Platform,
+  Animated, Easing,
+} from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../theme/theme';
+
+const SLIDE_DISTANCE = 500;
+const OPEN_DURATION = 280;
+const CLOSE_DURATION = 220;
 
 function parseHHMM(s) {
   const d = new Date();
@@ -34,38 +47,62 @@ export default function TimePickerModal({
 }) {
   const t = useTheme();
   const [picked, setPicked] = useState(() => parseHHMM(initialTime));
+  const [internalVisible, setInternalVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(SLIDE_DISTANCE)).current;
   const s = makeStyles(t);
 
-  // Reset to initial whenever the modal opens.
   useEffect(() => {
-    if (visible) setPicked(parseHHMM(initialTime));
-  }, [visible, initialTime]);
+    if (visible) {
+      setPicked(parseHHMM(initialTime));
+      setInternalVisible(true);
+      slideAnim.setValue(SLIDE_DISTANCE);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: OPEN_DURATION,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: SLIDE_DISTANCE,
+        duration: CLOSE_DURATION,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setInternalVisible(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const confirm = () => onConfirm(formatHHMM(picked));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={s.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={s.card}>
-          <View style={s.header}>
+    <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
+      <View style={s.modalRoot}>
+        <Pressable style={s.backdrop} onPress={onCancel} />
+        <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <View style={s.head}>
             <Pressable onPress={onCancel} hitSlop={10}>
               <Text style={s.cancel}>Cancel</Text>
             </Pressable>
             <Text style={s.title}>{title}</Text>
-            <Pressable onPress={confirm} hitSlop={10}>
-              <Text style={s.done}>Done</Text>
+            <Pressable onPress={confirm} hitSlop={10} style={s.donePill}>
+              <Text style={s.doneTxt}>Done</Text>
             </Pressable>
           </View>
-          <DateTimePicker
-            mode="time"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            value={picked}
-            onChange={(_evt, d) => { if (d) setPicked(d); }}
-            minuteInterval={5}
-            themeVariant={t.mode === 'dark' ? 'dark' : 'light'}
-          />
-        </View>
+
+          <View style={s.pickerCenter}>
+            <DateTimePicker
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              value={picked}
+              onChange={(_evt, d) => { if (d) setPicked(d); }}
+              minuteInterval={5}
+              themeVariant={t.mode === 'dark' ? 'dark' : 'light'}
+            />
+          </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -73,21 +110,41 @@ export default function TimePickerModal({
 
 function makeStyles(t) {
   return StyleSheet.create({
-    overlay: {
-      flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'flex-end',
+    modalRoot: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+    backdrop: { ...StyleSheet.absoluteFillObject },
+    sheet: {
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      backgroundColor: t.bg,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      paddingBottom: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      elevation: 10,
     },
-    card: {
-      backgroundColor: t.bg, borderTopLeftRadius: 16, borderTopRightRadius: 16,
-      paddingBottom: 18,
-    },
-    header: {
+    head: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
+      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8,
       borderBottomWidth: 1, borderBottomColor: t.line,
     },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink },
     cancel: { color: t.inkSoft, fontSize: 15 },
-    done: { color: t.ink, fontSize: 15, fontWeight: '700' },
+    title: { fontSize: 15, fontWeight: '700', color: t.ink },
+    donePill: {
+      backgroundColor: t.tabIdleBg,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 999,
+    },
+    doneTxt: {
+      color: t.inkSoft,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pickerCenter: {
+      alignItems: 'center',
+    },
   });
 }

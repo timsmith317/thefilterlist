@@ -1,10 +1,26 @@
 // app/filter/[id].js — Filter Detail.
 //
-// Mark Replaced button restyled:
-//   - Grey background (matches pill style elsewhere)
-//   - Inset with marginHorizontal: 16 so its edges align with the title text
-//     above (which sits at paddingLeft: 16 inside the paddingHorizontal: 18
-//     page padding), not the wider data rows card.
+// Mark Replaced is IN THE SCROLL FLOW (not pinned).
+//
+// Notes (in flow, never overlapped) appears in one of two places depending on
+// whether the filter has a linked part:
+//   - NO part: a right-justified "Notes ›" on its own line below the data
+//     card. The button's top margin is trimmed (s.markBtnNotesTop) so the
+//     Notes occupies the space rather than leaving a big empty gap.
+//   - HAS a part: "Notes ›" rides on the PART section-header row (PART on the
+//     left, Notes on the right), so it doesn't add a separate line of height
+//     and PART sits at its normal position. s.notesNudge applies a small
+//     vertical nudge to the inline Notes only, to optically center it with the
+//     (smaller) PART kicker text.
+// The two placements are mutually exclusive.
+//
+// Alignment: the text's right edge lands on the value column (= "May 6, 2026")
+// via paddingRight:16 / the header row's right padding. The chevron is
+// positioned absolutely at left:'100%' so it floats into the gutter without
+// shifting the text's right edge.
+//
+// Notes are authored on the Edit screen; the affordance only appears when
+// notes exist. Tapping opens NotesModal (read-only, dimmed sheet, Copy pill).
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
@@ -14,8 +30,9 @@ import { useTheme } from '../../theme/theme';
 import { TypeIcon } from '../../theme/Icons';
 import { BackButton, PillButton } from '../../components/HeaderBits';
 import DatePickerModal from '../../components/DatePickerModal';
+import NotesModal from '../../components/NotesModal';
 import {
-  loadData, saveData, statusOf, markReplaced, deleteFilter, getPart, isPartLow,
+  loadData, saveData, statusOf, markReplaced, getPart, isPartLow,
   FILTER_TYPES,
 } from '../../data/store';
 
@@ -25,6 +42,7 @@ export default function FilterDetail() {
   const { id } = useLocalSearchParams();
   const [data, setData] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -50,6 +68,7 @@ export default function FilterDetail() {
   const asset = data.assets.find(a => a.id === f.assetId);
   const part = getPart(data, f.partId);
   const partLow = isPartLow(part);
+  const hasNotes = !!(f.notes && f.notes.trim());
   const fmt = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   const onConfirmDate = async (date) => {
@@ -60,11 +79,20 @@ export default function FilterDetail() {
     await saveData(next);
   };
 
-  const onDelete = async () => {
-    const n = deleteFilter(data, f.id);
-    await saveData(n);
-    router.back();
-  };
+  // Shared Notes affordance (text + floating chevron). `style` lets the inline
+  // (PART-row) placement apply a small vertical nudge.
+  const NotesAffordance = ({ style }) => (
+    <Pressable
+      onPress={() => setNotesOpen(true)}
+      hitSlop={{ top: 8, bottom: 8, left: 24, right: 8 }}
+      style={style}
+    >
+      <View style={s.notesInner}>
+        <Text style={s.notesLinkTxt}>Notes</Text>
+        <Text style={s.notesChev}>›</Text>
+      </View>
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -88,9 +116,20 @@ export default function FilterDetail() {
           <Row t={t} k="Next due" v={fmt(status.due)} last />
         </View>
 
+        {/* No part → Notes on its own line below the card. */}
+        {hasNotes && !part && (
+          <View style={s.notesRow}>
+            <NotesAffordance />
+          </View>
+        )}
+
         {part && (
           <>
-            <Text style={s.sectionLabel}>PART</Text>
+            {/* Has part → PART on the left, Notes on the right, one line. */}
+            <View style={s.partHeaderRow}>
+              <Text style={s.partLabel}>PART</Text>
+              {hasNotes && <NotesAffordance style={s.notesNudge} />}
+            </View>
             <Pressable style={s.partCard} onPress={() => router.push(`/part/${part.id}`)}>
               <View style={{ flex: 1 }}>
                 <Text style={s.partName} numberOfLines={1}>{part.name || 'Untitled part'}</Text>
@@ -107,13 +146,11 @@ export default function FilterDetail() {
           </>
         )}
 
-        <Pressable style={s.markBtn} onPress={() => setPickerOpen(true)}>
+        <Pressable
+          style={[s.markBtn, (hasNotes && !part) && s.markBtnNotesTop]}
+          onPress={() => setPickerOpen(true)}
+        >
           <Text style={s.markBtnTxt}>✓ Mark Replaced</Text>
-        </Pressable>
-        <Text style={s.hint}>Tap to choose the install date.</Text>
-
-        <Pressable style={s.delBtn} onPress={onDelete}>
-          <Text style={s.delTxt}>Delete Filter</Text>
         </Pressable>
       </ScrollView>
 
@@ -121,9 +158,16 @@ export default function FilterDetail() {
         visible={pickerOpen}
         initialDate={new Date()}
         maximumDate={new Date()}
-        title="Install date"
+        title="Install Date"
         onCancel={() => setPickerOpen(false)}
         onConfirm={onConfirmDate}
+      />
+
+      <NotesModal
+        visible={notesOpen}
+        notes={f.notes || ''}
+        title="Notes"
+        onCancel={() => setNotesOpen(false)}
       />
     </SafeAreaView>
   );
@@ -152,7 +196,25 @@ function makeStyles(t) {
 
     rows: { marginTop: 22, backgroundColor: t.card, borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: t.line },
 
-    sectionLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
+    // No-part: Notes on its own line. paddingRight:16 right-aligns the text to
+    // the value column; marginTop is the small gap below the card.
+    notesRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 16, marginTop: 14 },
+
+    // Has-part: PART header row carries PART (left) + Notes (right) on one line.
+    // marginTop is the gap below the data card — tune to taste.
+    partHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 8, paddingHorizontal: 16 },
+    partLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase' },
+
+    // Vertical nudge for the INLINE (PART-row) Notes only, to optically center
+    // it with the smaller PART kicker. More negative = higher.
+    notesNudge: { transform: [{ translateY: -16 }] },
+
+    // Positioning context for the absolute chevron; sizes to the text width.
+    notesInner: { alignSelf: 'flex-end' },
+    notesLinkTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    // Chevron floats just right of the text (left:'100%'), into the gutter.
+    notesChev: { position: 'absolute', left: '100%', marginLeft: 4, top: -1, color: t.muted, fontSize: 17, lineHeight: 18, fontWeight: '700' },
+
     partCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14 },
     partName: { fontSize: 15, fontWeight: '700', color: t.ink },
     partMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
@@ -162,13 +224,11 @@ function makeStyles(t) {
     lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
     chev: { fontSize: 22, color: t.muted, marginLeft: 8 },
 
-    // Grey button, inset 16 on each side so edges align with the title text
-    // above (title sits at paddingLeft: 16 inside paddingHorizontal: 18 page).
+    // Grey button, inset 16 each side. Default top margin matches no-notes.
     markBtn: { marginTop: 22, marginHorizontal: 16, backgroundColor: t.tabIdleBg, padding: 14, borderRadius: t.radius.btn, alignItems: 'center' },
+    // Only when Notes is on its own line (no part): the Notes already separates
+    // the button from the card, so trim the button's top gap.
+    markBtnNotesTop: { marginTop: 14 },
     markBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
-    hint: { fontSize: 12, color: t.muted, marginTop: 8, textAlign: 'center' },
-
-    delBtn: { marginTop: 22, padding: 12, alignItems: 'center' },
-    delTxt: { color: '#dc2626', fontSize: 14 },
   });
 }

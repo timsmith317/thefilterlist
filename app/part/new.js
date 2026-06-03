@@ -6,9 +6,15 @@
 // When opened via filterId param (from the Part picker on Edit Filter), the
 // newly-created part is linked to that filter AND its id is stored in the
 // pendingPart shared state so Edit Filter can auto-select it on return.
+//
+// Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
+// scrolls the focused input clear of the keyboard. bottomOffset keeps a little
+// breathing room above the keyboard top edge. Requires <KeyboardProvider> in
+// app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
@@ -82,7 +88,11 @@ export default function NewPart() {
         <PillButton label="Save" onPress={save} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        bottomOffset={20}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={s.title}>New Part</Text>
         <Text style={s.sub}>Track stock and reorder info for this filter.</Text>
 
@@ -120,7 +130,7 @@ export default function NewPart() {
         <Text style={s.hint}>Up to {MAX_PART_PHOTOS} reference photos.</Text>
 
         {!!filterId && <Text style={[s.hint, { marginTop: 16 }]}>This part will be linked to the filter you came from.</Text>}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

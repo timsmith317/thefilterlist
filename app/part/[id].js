@@ -1,16 +1,27 @@
 // app/part/[id].js — Part Detail.
 //
-// View and Edit modes now share the SAME title metrics and the SAME spacing
-// down to ON HAND, so toggling edit/save doesn't shift the page.
+// View and Edit modes share the same title metrics and spacing down to ON
+// HAND, so toggling edit/save doesn't shift the page.
 //   - title and titleInput both fontSize 26, same marginTop, no underline
 //   - the low-stock slot renders in BOTH modes (empty in edit) so the gap to
 //     ON HAND is identical
-//   - slot height tightened so it's not too tall when the badge is absent
 //
 // Threshold text reads "Alert when N or less".
+//
+// Delete Part now lives in EDIT mode only (was view mode). Matches the
+// pattern on the Filter Edit screen and iOS conventions — destructive
+// actions surface behind the explicit "I'm editing this" gate, not on
+// the casual view screen. Used By stays in view mode since it's
+// informational, not destructive.
+//
+// Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
+// scrolls the focused input clear of the keyboard in edit mode (SKU /
+// REORDER URL sit low on the form). Requires <KeyboardProvider> in
+// app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Linking, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
@@ -129,7 +140,11 @@ export default function PartDetail() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        bottomOffset={20}
+        keyboardShouldPersistTaps="handled"
+      >
         {editing ? (
           <TextInput value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} placeholder="Name" placeholderTextColor={t.muted} style={s.titleInput} />
         ) : (
@@ -137,8 +152,7 @@ export default function PartDetail() {
         )}
 
         {/* Low-stock slot renders in BOTH modes (empty in edit) so the gap to
-            ON HAND is identical and the page doesn't shift on save. Height
-            tightened to just fit the badge. */}
+            ON HAND is identical and the page doesn't shift on save. */}
         <View style={s.lowSlot}>
           {!editing && low && (
             <View style={s.lowPill}><Text style={s.lowPillTxt}>Low Stock</Text></View>
@@ -195,6 +209,7 @@ export default function PartDetail() {
         </View>
         <Text style={s.hint}>Up to {MAX_PART_PHOTOS} reference photos.</Text>
 
+        {/* Used By: informational, view-mode only — unchanged. */}
         {!editing && filters.length > 0 && (
           <>
             <Text style={s.label}>USED BY ({filters.length})</Text>
@@ -209,12 +224,15 @@ export default function PartDetail() {
           </>
         )}
 
-        {!editing && (
+        {/* Delete Part: edit-mode only (was view-mode). Matches Filter Edit
+            and the iOS convention of putting destructive actions behind
+            the explicit Edit gate. */}
+        {editing && (
           <Pressable style={s.delBtn} onPress={askDelete}>
             <Text style={s.delTxt}>Delete Part</Text>
           </Pressable>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

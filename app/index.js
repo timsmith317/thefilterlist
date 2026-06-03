@@ -1,3 +1,8 @@
+// app/index.js — Due Soon (home screen).
+//
+// Config constants (tweak these):
+//   LOCKUP_NUDGE: horizontal nudge (px) for the brand lockup (logo +
+//     wordmark) to keep it optically centered.
 //   WORDMARK_COLOR: the color of "The Filter List" text.
 //     Forest green '#15803d' to match logo, near-black '#0f172a' for neutral,
 //     or sage greens like '#7c9885' for softer tone.
@@ -57,7 +62,7 @@ export default function DueSoon() {
         <Text style={s.title}>Due Soon</Text>
         <View style={s.settingsWrap}>
           <Pressable style={s.settings} onPress={() => router.push('/settings')} hitSlop={8}>
-            <IconGear size={16} color={t.inkSoft} />
+            <IconGear size={16} color={t.ink} />
             <Text style={s.settingsTxt}>Settings</Text>
           </Pressable>
         </View>
@@ -129,7 +134,8 @@ function makeStyles(t) {
     title: { ...t.type.screenTitle, color: t.ink },
     settingsWrap: { paddingTop: 5 },
     settings: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: t.tabIdleBg },
-    settingsTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
+    // Bold + full black to match the app's pill labels (Edit, Save, Done, etc.).
+    settingsTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
     sub: { fontSize: 13, color: t.muted, paddingHorizontal: CONTENT_INSET, paddingBottom: 4 },
 
     tabsWrap: { flexGrow: 0 },
@@ -137,12 +143,16 @@ function makeStyles(t) {
     // ScrollView width, so justifyContent: 'space-between' actually
     // spreads the few pills across the row. gap is the minimum spacing
     // for the overflow case (many categories scrolling).
+    // paddingTop (20) is larger than paddingBottom (t.space.sm = 8) to
+    // give the tabs row breathing room from the "N filters need
+    // attention" sub text above.
     tabs: {
       flexGrow: 1,
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: CONTENT_INSET,
-      paddingVertical: t.space.sm,
+      paddingTop: 20,
+      paddingBottom: t.space.sm,
       gap: t.space.sm,
     },
     tab: { paddingHorizontal: t.space.lg, paddingVertical: 7, borderRadius: t.radius.md, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.line },

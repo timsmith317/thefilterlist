@@ -6,9 +6,9 @@
 //   - Subtitle (13pt, muted)
 //   - Stack of bordered cards, each linking to a subscreen
 //
-// Cards link via `route`. If route is null, the row is a not-yet-built stub:
-// it renders WITHOUT a chevron and shows a brief "coming soon" alert on tap.
-// The footnote at the bottom explains the chevron convention to the user.
+// Cards link via `route`. If a row is ever added without a route, it
+// renders without a chevron and shows a "coming soon" alert on tap —
+// defensive code path; all current rows have routes.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
@@ -65,8 +65,6 @@ export default function Settings() {
             </Pressable>
           ))}
         </View>
-
-        <Text style={s.footnote}>Sections without a chevron are coming next.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -111,10 +109,5 @@ function makeStyles(t) {
     cardLabel: { fontSize: 16, fontWeight: '700', color: t.ink },
     cardDesc:  { fontSize: 13, color: t.muted, marginTop: 3 },
     chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
-
-    footnote: {
-      fontSize: 12, color: t.muted, marginTop: 14, paddingLeft: 16,
-      fontStyle: 'italic',
-    },
   });
 }

@@ -319,11 +319,13 @@ function makeStyles(t) {
     cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
     chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
 
+    // Matches the "Mark Replaced" button: grey fill, no border, bold black.
     addBtn: {
       marginTop: 6,
-      paddingVertical: 13, paddingHorizontal: 16,
-      borderRadius: 10, borderWidth: 1.5, borderColor: t.line,
-      backgroundColor: t.card, alignItems: 'center',
+      padding: 14,
+      borderRadius: t.radius.btn,
+      backgroundColor: t.tabIdleBg,
+      alignItems: 'center',
     },
     addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
 
@@ -376,11 +378,12 @@ function makeStyles(t) {
     },
     btnSecondary: { paddingVertical: 10, paddingHorizontal: 18 },
     btnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
+    // Grey fill + bold black to match the app's standard buttons.
     btnPrimary: {
       paddingVertical: 10, paddingHorizontal: 20,
-      borderRadius: 8, backgroundColor: t.ink,
+      borderRadius: 8, backgroundColor: t.tabIdleBg,
     },
-    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.bg },
+    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
 
     bottomActionSection: {
       marginTop: 18, paddingTop: 14,

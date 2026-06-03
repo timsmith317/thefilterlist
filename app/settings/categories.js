@@ -28,7 +28,8 @@
 // absolutely-positioned backdrop (which had screen-coverage issues).
 //
 // Protected (Home/Auto/Work) and Uncategorized rules:
-//   - Protected: no Edit button at all. Can still drag-reorder.
+//   - Protected: no Edit button at all. Can still drag-reorder. (No "locked"
+//     label — the absence of an Edit button is enough of a cue.)
 //   - Uncategorized: Edit button shows, but the Edit modal hides the
 //     Delete action (it's the orphan fallback, can't be deleted).
 
@@ -173,7 +174,6 @@ export default function CategoriesSettings() {
           <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
           <Text style={s.rowMeta}>
             {count} asset{count === 1 ? '' : 's'}
-            {!renameable && '  \u00b7  locked'}
           </Text>
         </View>
         {renameable && (
@@ -351,11 +351,13 @@ function makeStyles(t) {
 
     dragHandle: { fontSize: 22, color: t.muted, marginLeft: 4 },
 
+    // Matches the "Mark Replaced" button: grey fill, no border, bold black.
     addBtn: {
       marginTop: 12,
-      paddingVertical: 13, paddingHorizontal: 16,
-      borderRadius: 10, borderWidth: 1.5, borderColor: t.line,
-      backgroundColor: t.card, alignItems: 'center',
+      padding: 14,
+      borderRadius: t.radius.btn,
+      backgroundColor: t.tabIdleBg,
+      alignItems: 'center',
     },
     addBtnDim: { opacity: 0.5 },
     addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
@@ -389,9 +391,9 @@ function makeStyles(t) {
     btnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
     btnPrimary: {
       paddingVertical: 10, paddingHorizontal: 20,
-      borderRadius: 8, backgroundColor: t.ink,
+      borderRadius: 8, backgroundColor: t.tabIdleBg,
     },
-    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.bg },
+    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
 
     deleteSection: {
       marginTop: 18, paddingTop: 14,
