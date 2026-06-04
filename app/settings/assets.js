@@ -4,8 +4,9 @@
 //   /settings/assets           ← this file (active list, add, edit, archive)
 //   /settings/assets-archived  ← separate (archived list, Actions sheet)
 //
-// Edit modal uses inline category chips (rather than a nested PickerSheet)
-// to avoid the visual issues of opening a modal from inside a modal. With
+// "+ Add asset" routes to /asset/new (the shared New Asset page, also used by
+// the Choose Asset picker on Edit Filter). Edit still uses the inline modal
+// here with category chips (avoids opening a modal from inside a modal). With
 // MAX_CATEGORIES = 8, chips wrap to two lines max — perfectly readable.
 //
 // Modal pattern:
@@ -28,7 +29,7 @@ import { useTheme } from '../../theme/theme';
 import { BackButton, PillButton } from '../../components/HeaderBits';
 import {
   loadData, saveData,
-  addAsset, updateAsset, setAssetArchived,
+  updateAsset, setAssetArchived,
   filtersForAsset,
 } from '../../data/store';
 
@@ -51,7 +52,6 @@ export default function AssetsSettings() {
   const [contentH, setContentH] = useState(0);
   const [footerH, setFooterH] = useState(0);
 
-  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [nameInput, setNameInput] = useState('');
   const [catIdInput, setCatIdInput] = useState(null);
@@ -77,29 +77,6 @@ export default function AssetsSettings() {
   const persist = async (next) => {
     setData(next);
     await saveData(next);
-  };
-
-  const openAdd = () => {
-    const firstCat = categories[0];
-    setNameInput('');
-    setCatIdInput(firstCat ? firstCat.id : null);
-    setError(null);
-    setAdding(true);
-  };
-  const closeAdd = () => {
-    setAdding(false); setNameInput(''); setCatIdInput(null); setError(null);
-  };
-  const confirmAdd = async () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) { setError('Please enter a name.'); return; }
-    if (!catIdInput) { setError('Please pick a category.'); return; }
-    const exists = (data.assets || []).some(
-      a => !a.archived && a.name.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (exists) { setError('An asset with that name already exists.'); return; }
-    const next = addAsset(data, { name: trimmed, categoryId: catIdInput });
-    await persist(next);
-    closeAdd();
   };
 
   const openEdit = (asset) => {
@@ -203,7 +180,7 @@ export default function AssetsSettings() {
         })}
 
         {!overflow && (
-          <Pressable style={[s.addBtn, s.addBtnInline]} onPress={openAdd}>
+          <Pressable style={[s.addBtn, s.addBtnInline]} onPress={() => router.push('/asset/new')}>
             <Text style={s.addBtnTxt}>+ Add asset</Text>
           </Pressable>
         )}
@@ -214,28 +191,11 @@ export default function AssetsSettings() {
           style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
           onLayout={e => setFooterH(e.nativeEvent.layout.height)}
         >
-          <Pressable style={s.addBtn} onPress={openAdd}>
+          <Pressable style={s.addBtn} onPress={() => router.push('/asset/new')}>
             <Text style={s.addBtnTxt}>+ Add asset</Text>
           </Pressable>
         </View>
       )}
-
-      <AssetModal
-        visible={adding}
-        title="Add Asset"
-        nameInput={nameInput}
-        setNameInput={setNameInput}
-        catIdInput={catIdInput}
-        setCatIdInput={setCatIdInput}
-        categories={categories}
-        error={error}
-        setError={setError}
-        onCancel={closeAdd}
-        onConfirm={confirmAdd}
-        confirmLabel="Add"
-        s={s}
-        t={t}
-      />
 
       <AssetModal
         visible={!!editing}

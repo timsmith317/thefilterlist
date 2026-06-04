@@ -3,9 +3,15 @@
 // match Settings. Field labels indented 13 to align with input text inside
 // each input box.
 //
-// When opened via filterId param (from the Part picker on Edit Filter), the
-// newly-created part is linked to that filter AND its id is stored in the
-// pendingPart shared state so Edit Filter can auto-select it on return.
+// Two ways in:
+//   - From the Parts inventory ("+ Add part"): no filterId. Save/Cancel just
+//     pop back to the inventory.
+//   - From the Choose Part picker on Edit Filter ("+ Add new part"): filterId
+//     is set. New Part is stacked ON TOP of the picker. On Save we link the
+//     part to the filter, hand its id back to Edit Filter via pendingPick, and
+//     pop BOTH this screen and the picker (dismiss(2)) so we land straight on
+//     Edit Filter with the new part selected. Cancel pops one level, back to
+//     the picker.
 //
 // Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
 // scrolls the focused input clear of the keyboard. bottomOffset keeps a little
@@ -22,7 +28,7 @@ import { PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
 import { loadData, saveData, addPart, updateFilter, MAX_PART_PHOTOS } from '../../data/store';
 import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/partPhotos';
-import { setPendingPart } from '../../lib/pendingPart';
+import { setPendingPick } from '../../lib/pendingPick';
 
 export default function NewPart() {
   const t = useTheme();
@@ -57,9 +63,16 @@ export default function NewPart() {
     const newPart = next.parts[next.parts.length - 1];
     if (filterId) next = updateFilter(next, filterId, { partId: newPart.id });
     await saveData(next);
-    // Signal Edit Filter to auto-select the new part on focus return.
-    if (filterId) setPendingPart(newPart.id);
-    router.back();
+
+    if (filterId) {
+      // Came from the Choose Part picker (stack: Edit Filter → picker → here).
+      // Hand the new part back to Edit Filter, then pop this screen AND the
+      // picker beneath it in one motion so we land straight on Edit Filter.
+      setPendingPick({ field: 'part', value: newPart.id });
+      router.dismiss(2);
+    } else {
+      router.back();
+    }
   };
 
   const onPickPhoto = async (source) => {

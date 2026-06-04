@@ -1,10 +1,13 @@
 // app/settings/filters.js — Filters inventory.
 //
-// The one place to see and manage EVERY filter, regardless of which asset
-// it belongs to or whether that asset is archived. Tap a row to open the
-// filter detail (edit / mark replaced / notes); the bottom button adds a
-// new one (filter/new.js has its own asset picker, so no asset needs to be
-// pre-selected here).
+// The place to see and manage your live filters across every asset. Tap a
+// row to open the filter detail (edit / mark replaced / notes); the bottom
+// button adds a new one (filter/new.js has its own asset picker, so no asset
+// needs to be pre-selected here).
+//
+// Filters whose asset is archived are hidden here (same as the home and
+// category views). Unarchiving the asset brings its filters back — nothing
+// is deleted, this is just a computed view.
 //
 // Add button uses the same hug-then-pin behavior as the other list screens.
 
@@ -37,12 +40,15 @@ export default function FiltersInventory() {
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
   const assetsById = Object.fromEntries((data.assets || []).map(a => [a.id, a]));
-  // Every filter, sorted alphabetically by name.
+  // Live filters only — those whose asset exists and isn't archived —
+  // sorted alphabetically by name. Archived-asset filters are hidden here
+  // (they return when the asset is unarchived).
   const filters = (data.filters || [])
     .map(f => {
       const asset = assetsById[f.assetId];
       return { ...f, asset, archived: !asset || !!asset.archived, status: statusOf(f) };
     })
+    .filter(f => !f.archived)
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   const overflow = viewportH > 0 && contentH > viewportH;
@@ -77,12 +83,12 @@ export default function FiltersInventory() {
               <Pressable
                 key={f.id}
                 onPress={() => router.push(`/filter/${f.id}`)}
-                style={({ pressed }) => [s.card, f.archived && s.cardArchived, pressed && s.cardPressed]}
+                style={({ pressed }) => [s.card, pressed && s.cardPressed]}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.cardName} numberOfLines={1}>{f.name || 'Untitled filter'}</Text>
                   <Text style={s.cardMeta} numberOfLines={1}>
-                    {f.asset ? f.asset.name : 'No asset'}{f.archived ? ' · Archived' : ''} · every {f.intervalDays}d
+                    {f.asset.name} · every {f.intervalDays}d
                   </Text>
                 </View>
                 <View style={[s.statusPill, { backgroundColor: c.pillBg }]}>
@@ -137,7 +143,6 @@ function makeStyles(t) {
       backgroundColor: t.card,
       marginBottom: 10,
     },
-    cardArchived: { opacity: 0.6 },
     cardPressed: { backgroundColor: t.tabIdleBg },
     cardName: { fontSize: 16, fontWeight: '700', color: t.ink },
     cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },

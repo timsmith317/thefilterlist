@@ -28,14 +28,14 @@ const LIGHT = {
   card: '#ffffff',
   line: '#e8edf3',
   ink: '#0f172a',          // near-black — primary text & accents
-  inkSoft: '#475569',
-  muted: '#94a3b8',
-
+  inkSoft: '#475569',      // secondary text (Cancel, etc.)
+  muted: '#64748b',        // helper / hint / subtitle text — a touch darker
+                           // than before (was #94a3b8) for readability, still
+                           // clearly lighter than inkSoft so hierarchy holds
   // Brand identity — used by the wordmark, logo, and any screen element
   // that should carry the brand tone (e.g., the About title). Same value
   // as the "grn" status pill ink, intentionally — green is the brand.
   brand: '#15803d',
-
   // icon chip: white fill, grey outline, dark glyph
   iconBg: '#ffffff',
   iconBorder: '#94a3b8',
@@ -58,14 +58,14 @@ const DARK = {
   card: '#161f2e',         // dark slate card
   line: '#26334a',
   ink: '#f1f5f9',          // light text
-  inkSoft: '#cbd5e1',
-  muted: '#7c8aa0',
-
+  inkSoft: '#cbd5e1',      // secondary text
+  muted: '#94a3b8',        // helper / hint / subtitle text — a step brighter
+                           // than before (was #7c8aa0) so it reads better on
+                           // the dark canvas, still dimmer than inkSoft
   // Brand identity — brighter green for dark mode contrast. Matches the
   // dark-theme grn pill ink so the brand reads consistently against the
   // dark canvas.
   brand: '#4ade80',
-
   iconBg: '#1c2740',
   iconBorder: '#3a4a66',
   iconInk: '#cbd5e1',

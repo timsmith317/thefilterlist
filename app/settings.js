@@ -26,16 +26,16 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const s = makeStyles(t);
 
-  // Row order: Filters first (the core of the app), then Reminders →
-  // Categories → Assets → Parts → Backup. About lives at the bottom as a
-  // centered text link (not a chevron row). Built rows have a route;
-  // unbuilt rows have route:null and render without a chevron.
+  // Row order is usage-based: Filters → Parts → Assets → Categories →
+  // Reminders → Backup. About lives at the bottom as a centered text link
+  // (not a chevron row). Built rows have a route; unbuilt rows have
+  // route:null and render without a chevron.
   const rows = [
     { k: 'filters',    label: 'Filters',           desc: 'Add, edit, and schedule filters',   route: '/settings/filters' },
-    { k: 'reminders',  label: 'Reminders',         desc: 'Push notifications, lead time',     route: '/settings/reminders' },
-    { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',          route: '/settings/categories' },
-    { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive',       route: '/settings/assets' },
     { k: 'parts',      label: 'Parts Inventory',   desc: 'Track on-hand stock and reorders',  route: '/settings/parts' },
+    { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive',       route: '/settings/assets' },
+    { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',          route: '/settings/categories' },
+    { k: 'reminders',  label: 'Reminders',         desc: 'Push notifications, lead time',     route: '/settings/reminders' },
     { k: 'backup',     label: 'Backup & Restore',  desc: 'Export / import your data',         route: '/settings/backup' },
   ];
 

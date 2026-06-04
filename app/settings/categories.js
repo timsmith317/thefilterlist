@@ -47,7 +47,7 @@ import { BackButton } from '../../components/HeaderBits';
 import {
   loadData, saveData,
   MAX_CATEGORIES,
-  addCategory, renameCategory, deleteCategory, reorderCategories,
+  renameCategory, deleteCategory, reorderCategories,
   assetsInCategory, canRenameCategory, canDeleteCategory,
 } from '../../data/store';
 
@@ -64,7 +64,6 @@ export default function CategoriesSettings() {
   const [contentH, setContentH] = useState(0);
   const [footerH, setFooterH] = useState(0);
 
-  const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [nameInput, setNameInput] = useState('');
   const [error, setError] = useState(null);
@@ -99,29 +98,6 @@ export default function CategoriesSettings() {
       setData(next);
       saveData(next).catch(e => console.warn('reorder save failed', e));
     });
-  };
-
-  const openAdd = () => {
-    setNameInput('');
-    setError(null);
-    setAddOpen(true);
-  };
-  const closeAdd = () => {
-    setAddOpen(false);
-    setNameInput('');
-    setError(null);
-  };
-  const confirmAdd = async () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) { setError('Please enter a name.'); return; }
-    if (atCap) { setError(`You can have up to ${MAX_CATEGORIES} categories.`); return; }
-    const exists = (data.categories || []).some(
-      c => c.name.toLowerCase() === trimmed.toLowerCase()
-    );
-    if (exists) { setError('A category with that name already exists.'); return; }
-    const next = addCategory(data, trimmed);
-    await persistAndReseed(next);
-    closeAdd();
   };
 
   const openEdit = (cat) => {
@@ -209,7 +185,7 @@ export default function CategoriesSettings() {
   const inlineFooter = (
     <View>
       <Pressable
-        onPress={openAdd}
+        onPress={() => router.push('/category/new')}
         style={[s.addBtn, s.addBtnInline, atCap && s.addBtnDim]}
         disabled={atCap}
       >
@@ -253,7 +229,7 @@ export default function CategoriesSettings() {
             onLayout={e => setFooterH(e.nativeEvent.layout.height)}
           >
             <Pressable
-              onPress={openAdd}
+              onPress={() => router.push('/category/new')}
               style={[s.addBtn, atCap && s.addBtnDim]}
               disabled={atCap}
             >
@@ -263,45 +239,6 @@ export default function CategoriesSettings() {
             </Pressable>
           </View>
         )}
-
-        {/* Add Category modal */}
-        <Modal visible={addOpen} transparent animationType="fade" onRequestClose={closeAdd}>
-          <View style={s.modalRoot}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={s.overlay}
-            >
-              <Pressable style={s.backdrop} onPress={closeAdd} />
-              <View style={s.dialog}>
-                <Text style={s.dialogTitle}>Add Category</Text>
-                <Text style={s.dialogSub}>
-                  {categories.length} of {MAX_CATEGORIES} categories
-                </Text>
-                <TextInput
-                  style={s.input}
-                  value={nameInput}
-                  onChangeText={(v) => { setNameInput(v); if (error) setError(null); }}
-                  placeholder="e.g. Garage"
-                  placeholderTextColor={t.muted}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                  onSubmitEditing={confirmAdd}
-                  autoFocus
-                />
-                {!!error && <Text style={s.errorTxt}>{error}</Text>}
-                <View style={s.dialogActions}>
-                  <Pressable onPress={closeAdd} style={s.btnSecondary}>
-                    <Text style={s.btnSecondaryTxt}>Cancel</Text>
-                  </Pressable>
-                  <Pressable onPress={confirmAdd} style={s.btnPrimary}>
-                    <Text style={s.btnPrimaryTxt}>Add</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        </Modal>
 
         {/* Edit Category modal (rename + optional delete) */}
         <Modal visible={!!editing} transparent animationType="fade" onRequestClose={closeEdit}>

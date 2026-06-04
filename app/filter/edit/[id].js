@@ -1,22 +1,26 @@
 // app/filter/edit/[id].js — Edit Filter.
 //
-// Asset and Part are now selected via the PickerSheet modal (handles many
-// items with search), replacing the chip wrap that didn't scale.
+// Asset and Part are selected via the /picker modal route (handles many items
+// with search). The picker is a stacked screen rather than an overlay so that
+// "+ Add new part" can push New Part ON TOP of the picker — New Part covers it
+// and nothing rolls away.
 //
-// Part picker supports:
-//   - "None (no part linked)" row
-//   - "+ Add new part" row → routes to /part/new with filterId so the new
-//     part links automatically; setPendingPart() carries the new id back
-//     so Edit Filter can auto-select it on return.
+// Selection round-trip:
+//   - Tapping ASSET or PART pushes /picker with the current selection. The
+//     picker stashes the chosen id in lib/pendingPick and pops; we read it
+//     here on focus and fold it into the draft.
+//   - "+ Add new part" (inside the picker) routes to /part/new with filterId.
+//     New Part links the part, stashes it in pendingPick, and pops BOTH itself
+//     and the picker, landing back here with the new part selected.
 //
 // Notes: a multiline NOTES field sits at the bottom, just above Delete Filter.
 // It's where filter notes are authored; the detail screen shows them read-only
 // (with a Copy button) when present.
 //
-// Delete Filter lives at the bottom of THIS screen (the edit screen), not
-// the detail screen — same pattern iOS Notes/Reminders use. Burying the
-// destructive action under "Edit" makes it discoverable without making it
-// a one-tap-away mistake from the view screen.
+// Delete Filter lives at the bottom of THIS screen (the edit screen), not the
+// detail screen — same pattern iOS Notes/Reminders use. Burying the
+// destructive action under "Edit" makes it discoverable without making it a
+// one-tap-away mistake from the view screen.
 //
 // Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
 // scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
@@ -29,9 +33,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../../theme/theme';
 import { PillButton } from '../../../components/HeaderBits';
-import PickerSheet from '../../../components/PickerSheet';
 import { loadData, saveData, updateFilter, deleteFilter, FILTER_TYPES, partsList } from '../../../data/store';
-import { consumePendingPart } from '../../../lib/pendingPart';
+import { consumePendingPick } from '../../../lib/pendingPick';
 
 export default function EditFilter() {
   const t = useTheme();
@@ -40,12 +43,10 @@ export default function EditFilter() {
 
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState(null);
-  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
-  const [partPickerOpen, setPartPickerOpen] = useState(false);
 
   // Reload data on focus. On initial focus, initialize the draft. On
-  // subsequent focus (e.g., returning from the + Add new part flow),
-  // refresh the parts list AND consume any pending part selection.
+  // subsequent focus (returning from the picker or the + Add new part flow),
+  // refresh data AND consume any pending selection handed back by the picker.
   useFocusEffect(useCallback(() => {
     let active = true;
     loadData().then(d => {
@@ -55,8 +56,14 @@ export default function EditFilter() {
         const f = d.filters.find(x => x.id === id);
         if (f) setDraft({ ...f, interval: String(f.intervalDays), notes: f.notes || '' });
       } else {
-        const pending = consumePendingPart();
-        if (pending) setDraft(prev => ({ ...prev, partId: pending }));
+        const pick = consumePendingPick();
+        if (pick) {
+          setDraft(prev => ({
+            ...prev,
+            ...(pick.field === 'asset' ? { assetId: pick.value } : null),
+            ...(pick.field === 'part' ? { partId: pick.value } : null),
+          }));
+        }
       }
     });
     return () => { active = false; };
@@ -70,6 +77,12 @@ export default function EditFilter() {
 
   const currentAsset = assets.find(a => a.id === draft.assetId);
   const currentPart = parts.find(p => p.id === draft.partId);
+
+  const openAssetPicker = () =>
+    router.push({ pathname: '/picker', params: { kind: 'asset', selectedId: draft.assetId || '', filterId: id } });
+
+  const openPartPicker = () =>
+    router.push({ pathname: '/picker', params: { kind: 'part', selectedId: draft.partId || '', filterId: id } });
 
   const save = async () => {
     const patch = {
@@ -87,8 +100,8 @@ export default function EditFilter() {
 
   // Delete with destructive confirmation. After delete we router.back()
   // TWICE: once out of the edit screen, once out of the now-empty detail
-  // screen — landing the user back on Due Soon (or wherever they came
-  // from before the detail screen).
+  // screen — landing the user back on Due Soon (or wherever they came from
+  // before the detail screen).
   const askDelete = () => {
     Alert.alert(
       'Delete filter?',
@@ -101,11 +114,7 @@ export default function EditFilter() {
           onPress: async () => {
             const next = deleteFilter(data, id);
             await saveData(next);
-            // Back out of edit → detail. The detail screen will redirect
-            // away on its own next render since the filter no longer
-            // exists, OR pop again explicitly:
             router.back();
-            // Slight delay so the first back() commits before the second.
             setTimeout(() => router.back(), 0);
           },
         },
@@ -163,7 +172,7 @@ export default function EditFilter() {
         />
 
         <Text style={s.label}>ASSET</Text>
-        <Pressable style={s.pickerRow} onPress={() => setAssetPickerOpen(true)}>
+        <Pressable style={s.pickerRow} onPress={openAssetPicker}>
           <Text style={[s.pickerValue, !currentAsset && s.pickerPlaceholder]} numberOfLines={1}>
             {currentAsset ? currentAsset.name : 'Choose asset'}
           </Text>
@@ -171,7 +180,7 @@ export default function EditFilter() {
         </Pressable>
 
         <Text style={s.label}>PART</Text>
-        <Pressable style={s.pickerRow} onPress={() => setPartPickerOpen(true)}>
+        <Pressable style={s.pickerRow} onPress={openPartPicker}>
           <Text style={[s.pickerValue, !currentPart && s.pickerPlaceholder]} numberOfLines={1}>
             {currentPart ? currentPart.name : 'None'}
           </Text>
@@ -189,7 +198,6 @@ export default function EditFilter() {
           multiline
           textAlignVertical="top"
         />
-        <Text style={s.hint}>Shown on the filter's detail screen with a copy button.</Text>
 
         {/* Destructive action lives at the bottom of the Edit screen.
             iOS Notes / Reminders / Contacts use this same pattern — burying
@@ -199,47 +207,6 @@ export default function EditFilter() {
           <Text style={s.delTxt}>Delete Filter</Text>
         </Pressable>
       </KeyboardAwareScrollView>
-
-      <PickerSheet
-        visible={assetPickerOpen}
-        title="Choose Asset"
-        items={assets}
-        selectedId={draft.assetId}
-        onSelect={(aid) => {
-          setDraft({ ...draft, assetId: aid });
-          setAssetPickerOpen(false);
-        }}
-        onCancel={() => setAssetPickerOpen(false)}
-        searchPlaceholder="Search assets..."
-        emptyText="No assets yet."
-      />
-
-      <PickerSheet
-        visible={partPickerOpen}
-        title="Choose Part"
-        items={parts}
-        selectedId={draft.partId}
-        searchKeys={['name', 'sku']}
-        onSelect={(pid) => {
-          setDraft({ ...draft, partId: pid });
-          setPartPickerOpen(false);
-        }}
-        onSelectNone={() => {
-          setDraft({ ...draft, partId: null });
-          setPartPickerOpen(false);
-        }}
-        noneLabel="None (no part linked)"
-        onAddNew={() => {
-          setPartPickerOpen(false);
-          // Route to New Part with filterId so the new part links to this
-          // filter on save. Pending-id flow auto-selects it on return.
-          router.push({ pathname: '/part/new', params: { filterId: id } });
-        }}
-        addNewLabel="+ Add new part"
-        onCancel={() => setPartPickerOpen(false)}
-        searchPlaceholder="Search by name or SKU..."
-        emptyText="No parts yet."
-      />
     </SafeAreaView>
   );
 }
@@ -279,8 +246,7 @@ function makeStyles(t) {
     typeLabel: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
     typeLabelOn: { color: t.ink, fontWeight: '700' },
 
-    // Picker rows — replace the chip wraps. Same visual weight as inputs so
-    // the form feels uniform.
+    // Picker rows — same visual weight as inputs so the form feels uniform.
     pickerRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       padding: 13, borderRadius: 10, borderWidth: 1.5,
@@ -292,8 +258,7 @@ function makeStyles(t) {
 
     hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
 
-    // Destructive action at the bottom of the form. Same metrics that the
-    // Part detail uses for its (now edit-mode-only) Delete Part button.
+    // Destructive action at the bottom of the form.
     delBtn: { marginTop: 28, padding: 12, alignItems: 'center' },
     delTxt: { color: '#dc2626', fontSize: 14 },
   });
