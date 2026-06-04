@@ -12,26 +12,31 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
 import { BackButton } from '../components/HeaderBits';
 
+// Nudge the bottom "About" link vertically. Negative = up, positive = down.
+const ABOUT_NUDGE_Y = -8;
+
 export default function Settings() {
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const s = makeStyles(t);
 
-  // Row order matches the Preview app design (Reminders → Categories →
-  // Assets → Parts → Backup → About). Built rows have a route; unbuilt
-  // rows have route:null and render without a chevron.
+  // Row order: Filters first (the core of the app), then Reminders →
+  // Categories → Assets → Parts → Backup. About lives at the bottom as a
+  // centered text link (not a chevron row). Built rows have a route;
+  // unbuilt rows have route:null and render without a chevron.
   const rows = [
+    { k: 'filters',    label: 'Filters',           desc: 'Add, edit, and schedule filters',   route: '/settings/filters' },
     { k: 'reminders',  label: 'Reminders',         desc: 'Push notifications, lead time',     route: '/settings/reminders' },
     { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',          route: '/settings/categories' },
     { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive',       route: '/settings/assets' },
     { k: 'parts',      label: 'Parts Inventory',   desc: 'Track on-hand stock and reorders',  route: '/settings/parts' },
     { k: 'backup',     label: 'Backup & Restore',  desc: 'Export / import your data',         route: '/settings/backup' },
-    { k: 'about',      label: 'About',             desc: 'The Filter List',                   route: '/settings/about' },
   ];
 
   const onPress = (row) => {
@@ -46,9 +51,9 @@ export default function Settings() {
         <View />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView style={s.scrollView} contentContainerStyle={s.scroll}>
         <Text style={s.title}>Settings</Text>
-        <Text style={s.sub}>Configure reminders, categories, parts, and backups.</Text>
+        <Text style={s.sub}>Configure filters, reminders, categories, parts, and backups.</Text>
 
         <View style={s.cards}>
           {rows.map((r) => (
@@ -66,6 +71,14 @@ export default function Settings() {
           ))}
         </View>
       </ScrollView>
+
+      {/* About lives here as a centered text link, pinned to the bottom so
+          it's always reachable without scrolling. */}
+      <View style={[s.aboutFooter, { paddingBottom: Math.max(insets.bottom, 12), transform: [{ translateY: ABOUT_NUDGE_Y }] }]}>
+        <Pressable hitSlop={10} onPress={() => router.push('/settings/about')}>
+          <Text style={s.aboutLink}>About</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -80,7 +93,12 @@ function makeStyles(t) {
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
 
-    scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+    scroll: { paddingHorizontal: 18, paddingBottom: 24 },
+    scrollView: { flex: 1 },
+
+    // About — centered text link pinned at the bottom of the screen.
+    aboutFooter: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 18 },
+    aboutLink: { fontSize: 16, fontWeight: '700', color: t.ink },
 
     // Canonical screen title — 26/800/0.5 via t.type.screenTitle. Same
     // token as Due Soon, Filter detail, and every other screen header.
@@ -100,10 +118,10 @@ function makeStyles(t) {
     // but with a touch more vertical room since each card has two lines.
     card: {
       flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 14,
+      paddingHorizontal: 16, paddingVertical: 11,
       borderRadius: 12, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.card,
-      marginBottom: 10,
+      marginBottom: 8,
     },
     cardPressed: { backgroundColor: t.tabIdleBg },
     cardLabel: { fontSize: 16, fontWeight: '700', color: t.ink },

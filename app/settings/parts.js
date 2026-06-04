@@ -6,16 +6,22 @@
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
-import { BackButton, PillButton } from '../../components/HeaderBits';
+import { BackButton } from '../../components/HeaderBits';
 import { loadData, partsList, isPartLow, filtersUsingPart } from '../../data/store';
 
 export default function PartsInventory() {
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
+
+  // Hug-then-pin Add button (see assets.js for the rationale).
+  const [viewportH, setViewportH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const [footerH, setFooterH] = useState(0);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -28,15 +34,21 @@ export default function PartsInventory() {
 
   const parts = partsList(data);
   const lowCount = parts.filter(isPartLow).length;
+  const overflow = viewportH > 0 && contentH > viewportH;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <BackButton onPress={() => router.back()} />
-        <PillButton label="Add" onPress={() => router.push('/part/new')} />
+        <View />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setContentH(h)}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: (overflow ? footerH : 0) + 16 }}
+      >
         <Text style={s.title}>Parts Inventory</Text>
         <Text style={s.sub}>
           {parts.length === 0
@@ -62,7 +74,24 @@ export default function PartsInventory() {
             );
           })}
         </View>
+
+        {!overflow && (
+          <Pressable style={[s.addBtn, s.addBtnInline]} onPress={() => router.push('/part/new')}>
+            <Text style={s.addBtnTxt}>+ Add part</Text>
+          </Pressable>
+        )}
       </ScrollView>
+
+      {overflow && (
+        <View
+          style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          onLayout={e => setFooterH(e.nativeEvent.layout.height)}
+        >
+          <Pressable style={s.addBtn} onPress={() => router.push('/part/new')}>
+            <Text style={s.addBtnTxt}>+ Add part</Text>
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -80,5 +109,25 @@ function makeStyles(t) {
     lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
     chev: { fontSize: 22, color: t.muted },
+
+    // Matches the "Mark Replaced" / Add buttons on Categories & Assets:
+    // grey fill, no border, bold black.
+    addBtn: {
+      padding: 14,
+      borderRadius: t.radius.btn,
+      backgroundColor: t.tabIdleBg,
+      alignItems: 'center',
+    },
+    addBtnInline: { marginTop: 6 },
+    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+
+    // Pinned footer bar (opaque so the list scrolls behind it cleanly).
+    footer: {
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      backgroundColor: t.bg,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+    },
   });
 }

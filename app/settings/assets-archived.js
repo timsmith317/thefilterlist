@@ -4,12 +4,16 @@
 // Restore / Delete / Cancel — this gates the destructive Delete behind
 // an extra tap so it can't be triggered by a fat-finger on the list.
 // Each option still runs through its own confirmation alert.
+//
+// A "Delete all" button sits at the bottom (hug-then-pin, like the other
+// settings screens) for clearing the whole archive at once. It runs the
+// same destructive confirmation as the per-item delete.
 
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, Pressable, StyleSheet, ScrollView, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
@@ -23,7 +27,14 @@ import {
 export default function ArchivedAssetsSettings() {
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
+
+  // Hug-then-pin "Delete all" button (matches the other settings screens):
+  // inline while the list fits, pinned to the bottom once it overflows.
+  const [viewportH, setViewportH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const [footerH, setFooterH] = useState(0);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -38,6 +49,8 @@ export default function ArchivedAssetsSettings() {
     .filter(a => a.archived)
     .sort((a, b) => a.name.localeCompare(b.name));
   const categories = ((data.categories || [])).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const overflow = viewportH > 0 && contentH > viewportH;
 
   const persist = async (next) => {
     setData(next);
@@ -96,6 +109,30 @@ export default function ArchivedAssetsSettings() {
     ]);
   };
 
+  // Delete everything in the archive at once — same destructive warning,
+  // applied across all archived assets (and their filters).
+  const onDeleteAll = () => {
+    const count = archived.length;
+    if (!count) return;
+    const totalFilters = archived.reduce((sum, a) => sum + filtersForAsset(data, a.id).length, 0);
+    const headline = totalFilters > 0
+      ? `Delete all ${count} archived asset${count === 1 ? '' : 's'} and their ${totalFilters} filter${totalFilters === 1 ? '' : 's'}?`
+      : `Delete all ${count} archived asset${count === 1 ? '' : 's'}?`;
+    const msg = `${headline}\n\nBack up your data first if needed — this cannot be undone.`;
+    Alert.alert('Delete Forever', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete all',
+        style: 'destructive',
+        onPress: async () => {
+          let next = data;
+          for (const a of archived) next = deleteAsset(next, a.id);
+          await persist(next);
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
@@ -103,7 +140,12 @@ export default function ArchivedAssetsSettings() {
         <View />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView
+        style={s.scrollView}
+        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setContentH(h)}
+        contentContainerStyle={[s.scroll, { paddingBottom: (overflow ? footerH : 0) + 16 }]}
+      >
         <Text style={s.title}>Archived Assets</Text>
         <Text style={s.sub}>
           Tap an asset to restore it or delete it permanently.
@@ -132,7 +174,24 @@ export default function ArchivedAssetsSettings() {
             </Pressable>
           );
         })}
+
+        {archived.length > 0 && !overflow && (
+          <Pressable style={[s.deleteAllBtn, s.deleteAllInline]} onPress={onDeleteAll}>
+            <Text style={s.deleteAllTxt}>Delete all</Text>
+          </Pressable>
+        )}
       </ScrollView>
+
+      {archived.length > 0 && overflow && (
+        <View
+          style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          onLayout={e => setFooterH(e.nativeEvent.layout.height)}
+        >
+          <Pressable style={s.deleteAllBtn} onPress={onDeleteAll}>
+            <Text style={s.deleteAllTxt}>Delete all</Text>
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -145,6 +204,9 @@ function makeStyles(t) {
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
     scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+    // flex:1 bounds the scroll view so a long list scrolls instead of
+    // overflowing off-screen (same fix as the other list screens).
+    scrollView: { flex: 1 },
 
     title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
     sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
@@ -163,5 +225,24 @@ function makeStyles(t) {
     cardName: { fontSize: 16, fontWeight: '700', color: t.ink },
     cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
     chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
+
+    // "Delete all" — same grey-fill shape/behavior as the other big buttons.
+    deleteAllBtn: {
+      padding: 14,
+      borderRadius: t.radius.btn,
+      backgroundColor: t.tabIdleBg,
+      alignItems: 'center',
+    },
+    deleteAllInline: { marginTop: 6 },
+    deleteAllTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+
+    // Pinned footer bar (opaque so the list scrolls behind it cleanly).
+    footer: {
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      backgroundColor: t.bg,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+    },
   });
 }

@@ -91,10 +91,9 @@ export default function DatePickerModal({ visible, initialDate, maximumDate, tit
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               maximumDate={maximumDate}
-              // The library deprecated `onChange` in favor of `onValueChange`.
-              // We provide BOTH so this component works on whichever version
-              // is installed without warnings or breakage.
-              onChange={(_e, d) => { if (d) setDate(d); }}
+              // The library deprecated `onChange` in favor of `onValueChange`
+              // (same (event, date) signature; the new listener takes
+              // precedence). Using only onValueChange clears the warning.
               onValueChange={(_e, d) => { if (d) setDate(d); }}
               themeVariant={t.mode === 'dark' ? 'dark' : 'light'}
             />

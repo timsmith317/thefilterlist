@@ -38,7 +38,7 @@ import {
   View, Text, Pressable, StyleSheet, Modal, TextInput,
   KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -54,8 +54,15 @@ import {
 export default function CategoriesSettings() {
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
   const [categories, setCategories] = useState([]);
+
+  // Hug-then-pin Add button (see assets.js). DraggableFlatList forwards
+  // onContentSizeChange and onContainerLayout, so we can measure both.
+  const [viewportH, setViewportH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const [footerH, setFooterH] = useState(0);
 
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -195,11 +202,15 @@ export default function CategoriesSettings() {
     </View>
   );
 
-  const footer = (
+  const overflow = viewportH > 0 && contentH > viewportH;
+
+  // Inline (hugging) Add button — used as the list footer when the content
+  // fits on screen.
+  const inlineFooter = (
     <View>
       <Pressable
         onPress={openAdd}
-        style={[s.addBtn, atCap && s.addBtnDim]}
+        style={[s.addBtn, s.addBtnInline, atCap && s.addBtnDim]}
         disabled={atCap}
       >
         <Text style={s.addBtnTxt}>
@@ -222,16 +233,36 @@ export default function CategoriesSettings() {
 
         <DraggableFlatList
           data={categories}
+          containerStyle={{ flex: 1 }}
+          onContainerLayout={({ layout }) => setViewportH(layout.height)}
+          onContentSizeChange={(w, h) => setContentH(h)}
           onDragEnd={onDragEnd}
           activationDistance={12}
           keyExtractor={item => item.id}
           renderItem={renderRow}
-          contentContainerStyle={s.listContent}
+          contentContainerStyle={[s.listContent, overflow && { paddingBottom: footerH + 16 }]}
           ListHeaderComponent={header}
-          ListFooterComponent={footer}
+          ListFooterComponent={overflow ? null : inlineFooter}
           removeClippedSubviews={false}
           showsVerticalScrollIndicator={false}
         />
+
+        {overflow && (
+          <View
+            style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+            onLayout={e => setFooterH(e.nativeEvent.layout.height)}
+          >
+            <Pressable
+              onPress={openAdd}
+              style={[s.addBtn, atCap && s.addBtnDim]}
+              disabled={atCap}
+            >
+              <Text style={s.addBtnTxt}>
+                {atCap ? `${MAX_CATEGORIES}/${MAX_CATEGORIES} categories` : '+ Add category'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Add Category modal */}
         <Modal visible={addOpen} transparent animationType="fade" onRequestClose={closeAdd}>
@@ -353,14 +384,24 @@ function makeStyles(t) {
 
     // Matches the "Mark Replaced" button: grey fill, no border, bold black.
     addBtn: {
-      marginTop: 12,
       padding: 14,
       borderRadius: t.radius.btn,
       backgroundColor: t.tabIdleBg,
       alignItems: 'center',
     },
+    // Inline (hugging) placement gets a gap from the last row.
+    addBtnInline: { marginTop: 12 },
     addBtnDim: { opacity: 0.5 },
     addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+
+    // Pinned footer bar (opaque so the list scrolls behind it cleanly).
+    footer: {
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      backgroundColor: t.bg,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+    },
 
     // Modal root: direct child of <Modal>, flex:1, carries the dim. This is
     // the element we know reliably fills the modal viewport.

@@ -22,20 +22,34 @@ import {
   View, Text, Pressable, StyleSheet, ScrollView, Modal, TextInput,
   KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
-import { BackButton } from '../../components/HeaderBits';
+import { BackButton, PillButton } from '../../components/HeaderBits';
 import {
   loadData, saveData,
   addAsset, updateAsset, setAssetArchived,
   filtersForAsset,
 } from '../../data/store';
 
+// Nudge the "Archive" pill on the ACTIVE ASSETS row. Positive x = right,
+// positive y = down. Tweak if it needs to sit a little differently.
+const ARCHIVE_PILL_NUDGE = { x: 0, y: -28 };
+
 export default function AssetsSettings() {
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
+
+  // Hug-then-pin Add button: when the scroll content is taller than the
+  // visible area, the button pins to the bottom and the list scrolls behind
+  // it; otherwise the button sits inline, hugging the list. The pinned
+  // footer's height always exceeds the inline button's, giving natural
+  // hysteresis so the two modes don't flip-flop at the boundary.
+  const [viewportH, setViewportH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const [footerH, setFooterH] = useState(0);
 
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -57,6 +71,8 @@ export default function AssetsSettings() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const archivedCount = (data.assets || []).filter(a => a.archived).length;
   const categories = ((data.categories || [])).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const overflow = viewportH > 0 && contentH > viewportH;
 
   const persist = async (next) => {
     setData(next);
@@ -137,13 +153,32 @@ export default function AssetsSettings() {
         <View />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView
+        style={s.scrollView}
+        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(w, h) => setContentH(h)}
+        contentContainerStyle={[s.scroll, { paddingBottom: (overflow ? footerH : 0) + 16 }]}
+      >
         <Text style={s.title}>Assets & Archive</Text>
         <Text style={s.sub}>
           Manage homes, cars, offices, and other places with filters.
         </Text>
 
-        <Text style={s.label}>ACTIVE ASSETS</Text>
+        <View style={s.labelRow}>
+          <Text style={s.label}>ACTIVE ASSETS</Text>
+          {archivedCount > 0 && (
+            <View
+              style={[s.archivePillWrap, {
+                transform: [
+                  { translateX: ARCHIVE_PILL_NUDGE.x },
+                  { translateY: ARCHIVE_PILL_NUDGE.y },
+                ],
+              }]}
+            >
+              <PillButton label="Archive" onPress={() => router.push('/settings/assets-archived')} />
+            </View>
+          )}
+        </View>
         {activeAssets.length === 0 && (
           <Text style={s.empty}>No assets yet. Tap + Add Asset below to create your first.</Text>
         )}
@@ -167,20 +202,23 @@ export default function AssetsSettings() {
           );
         })}
 
-        <Pressable style={s.addBtn} onPress={openAdd}>
-          <Text style={s.addBtnTxt}>+ Add asset</Text>
-        </Pressable>
-
-        {archivedCount > 0 && (
-          <Pressable
-            style={s.archiveLink}
-            onPress={() => router.push('/settings/assets-archived')}
-          >
-            <Text style={s.archiveLinkTxt}>View archived ({archivedCount})</Text>
-            <Text style={s.archiveLinkChev}>{'\u203A'}</Text>
+        {!overflow && (
+          <Pressable style={[s.addBtn, s.addBtnInline]} onPress={openAdd}>
+            <Text style={s.addBtnTxt}>+ Add asset</Text>
           </Pressable>
         )}
       </ScrollView>
+
+      {overflow && (
+        <View
+          style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+          onLayout={e => setFooterH(e.nativeEvent.layout.height)}
+        >
+          <Pressable style={s.addBtn} onPress={openAdd}>
+            <Text style={s.addBtnTxt}>+ Add asset</Text>
+          </Pressable>
+        </View>
+      )}
 
       <AssetModal
         visible={adding}
@@ -300,11 +338,20 @@ function makeStyles(t) {
     },
 
     scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+    // flex:1 bounds the scroll view to the screen so a long list scrolls
+    // (and the Add button stays reachable) instead of overflowing off-screen.
+    scrollView: { flex: 1 },
 
     title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
     sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
 
-    label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 4, marginBottom: 8, paddingLeft: 13 },
+    // ACTIVE ASSETS label on the left, Archive pill on the right.
+    labelRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      marginTop: 4, marginBottom: 8,
+    },
+    label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', paddingLeft: 13 },
+    archivePillWrap: { paddingRight: 2 },
     empty: { fontSize: 13, color: t.muted, fontStyle: 'italic', paddingLeft: 13, paddingVertical: 8 },
 
     card: {
@@ -321,20 +368,23 @@ function makeStyles(t) {
 
     // Matches the "Mark Replaced" button: grey fill, no border, bold black.
     addBtn: {
-      marginTop: 6,
       padding: 14,
       borderRadius: t.radius.btn,
       backgroundColor: t.tabIdleBg,
       alignItems: 'center',
     },
+    // Inline (hugging) placement gets a little gap from the last row.
+    addBtnInline: { marginTop: 6 },
     addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
 
-    archiveLink: {
-      marginTop: 18, paddingHorizontal: 13,
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    // Pinned footer bar (opaque so the list scrolls behind it cleanly).
+    footer: {
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      backgroundColor: t.bg,
+      paddingHorizontal: 18,
+      paddingTop: 10,
     },
-    archiveLinkTxt: { fontSize: 14, color: t.inkSoft, fontWeight: '600' },
-    archiveLinkChev: { fontSize: 20, color: t.muted },
 
     // Modal root: direct child of <Modal>, flex:1, carries the dim. This is
     // the element we know reliably fills the modal viewport.
