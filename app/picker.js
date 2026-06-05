@@ -2,55 +2,75 @@
 //
 // Why a route instead of an overlay <Modal>: when "+ Add new part" pushes the
 // New Part screen, we want New Part to slide up ON TOP of this picker and
-// cover it, with the picker staying put underneath — no visible "roll to the
-// bottom." An overlay Modal lives above the navigation stack, so the only way
-// New Part could become visible was for the picker to dismiss first (the
-// roll-away we were trying to get rid of). As a modal ROUTE, New Part stacks
-// natively on top of it instead, and opening this picker is the native sheet
-// slide again (no custom dim flash).
+// cover it, with the picker staying put underneath. As a modal ROUTE, New Part
+// stacks natively on top; opening this picker is the native sheet slide.
+//
+// Two selection modes:
+//   SINGLE (default) — tap a row to choose one value; resolves immediately to
+//     the opener via lib/pendingPick { field:kind, value, stageId } and pops.
+//     Used for assets and for a single stage's part (the StagesEditor flow).
+//   MULTI (param multi='1', parts only) — tap rows to toggle a checkbox set,
+//     seeded from `selectedIds`. Done returns the whole set as
+//     { field:'parts', values:[...] }; Cancel pops with nothing pending.
+//     Used by the Filter editor to pick the set of parts a filter contains.
+//
+// "+ Add new part" pushes New Part on top:
+//   - single: New Part pops BOTH itself and this picker (dismiss 2), handing
+//     the new part straight to the opener.
+//   - multi: New Part pops back to THIS picker (pop 1) and hands the new id
+//     back via { field:'addPart', value }, which we fold into the live
+//     selection here so it lands pre-checked; Done then returns the set.
 //
 // Params (all strings, via the URL):
 //   kind       - 'part' | 'asset'
-//   selectedId - currently selected id ('' / undefined means none)
-//   filterId   - the filter to link a newly created item to. Passed through
-//                to New Part / New Asset so the new item links to the filter
-//                and is auto-selected on return.
-//
-// Selection is handed back to the opener via lib/pendingPick, then we pop.
-// Tapping a row, "None", or creating a new part all resolve through there;
-// Cancel / swipe-down just pops with nothing pending (opener keeps its value).
-//
-// Layout matches the old PickerSheet: header (title + Cancel) / search /
-// scrollable list (optional "None" at top). For parts, the "+ Add new part"
-// button hugs the list when everything fits and pins to the bottom once the
-// list scrolls.
+//   multi      - '1' to enable multi-select (parts only)
+//   selectedId - SINGLE: the currently selected id ('' = none)
+//   selectedIds- MULTI: comma-separated currently selected ids
+//   stageId    - (single part picks) the draft stage this pick is FOR
+//   filterId   - (asset picks) the filter a newly created asset links to
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../theme/theme';
 import { loadData, partsList } from '../data/store';
-import { setPendingPick } from '../lib/pendingPick';
+import { setPendingPick, consumePendingPick } from '../lib/pendingPick';
 
 export default function Picker() {
   const t = useTheme();
   const router = useRouter();
-  const { kind, selectedId, filterId } = useLocalSearchParams();
+  const { kind, multi, selectedId, selectedIds, filterId, stageId } = useLocalSearchParams();
   const isPart = kind === 'part';
+  const isMulti = isPart && (multi === '1' || multi === 'true');
 
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(() =>
+    new Set((selectedIds ? String(selectedIds).split(',') : []).filter(Boolean))
+  );
   // Measure scroll viewport vs. content to decide whether the Add button
   // hugs the list (fits) or pins to the bottom (scrolls).
   const [viewportH, setViewportH] = useState(0);
   const [contentH, setContentH] = useState(0);
   const s = makeStyles(t);
 
-  useEffect(() => { loadData().then(setData); }, []);
+  // Reload on focus so a just-created part shows up; in multi mode also fold a
+  // newly-created part into the live selection.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    loadData().then(d => { if (active) setData(d); });
+    if (isMulti) {
+      const pick = consumePendingPick();
+      if (pick && pick.field === 'addPart' && pick.value) {
+        setSelected(prev => new Set(prev).add(pick.value));
+      }
+    }
+    return () => { active = false; };
+  }, [isMulti]));
 
   const items = useMemo(() => {
     if (!data) return [];
@@ -58,7 +78,7 @@ export default function Picker() {
   }, [data, isPart]);
 
   const searchKeys = isPart ? ['name', 'sku'] : ['name'];
-  const title = isPart ? 'Choose Part' : 'Choose Asset';
+  const title = isMulti ? 'Choose Parts' : (isPart ? 'Choose Part' : 'Choose Asset');
   const searchPlaceholder = isPart ? 'Search by name or SKU...' : 'Search assets...';
   const emptyText = isPart ? 'No parts yet.' : 'No assets yet.';
 
@@ -75,25 +95,34 @@ export default function Picker() {
   }, [items, query]);
 
   const noMatches = query && filtered.length === 0;
-  const showNoneRow = isPart && !query;
+  const showNoneRow = isPart && !isMulti && !query;
   const overflow = viewportH > 0 && contentH > viewportH;
 
-  // The Add button shows when we have a filter to link the new item to
-  // (Edit Filter always passes filterId). Part → New Part, asset → New Asset.
-  const showAdd = !!filterId;
+  const showAdd = isPart ? true : !!filterId;
   const addLabel = isPart ? '+ Add new part' : '+ Add asset';
   const addPath = isPart ? '/part/new' : '/asset/new';
 
-  // Resolve the selection back to the opener, then pop this screen.
+  // SINGLE: resolve one value to the opener and pop.
   const choose = (value) => {
-    setPendingPick({ field: kind, value });
+    setPendingPick({ field: kind, value, stageId });
+    router.back();
+  };
+  // MULTI: toggle membership locally; Done returns the set.
+  const toggle = (id) =>
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  const done = () => {
+    setPendingPick({ field: 'parts', values: [...selected] });
     router.back();
   };
 
-  // Push the New Part/Asset screen ON TOP of this picker (it covers; nothing
-  // rolls away). On save it pops itself AND this picker back to Edit Filter.
+  // Push New Part/Asset ON TOP. In multi we pass multi so New Part returns to
+  // THIS picker; otherwise it carries stageId/filterId for the single flow.
   const addNew = () => {
-    router.push({ pathname: addPath, params: { filterId } });
+    router.push({ pathname: addPath, params: isMulti ? { multi: '1' } : { filterId, stageId } });
   };
 
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
@@ -101,11 +130,23 @@ export default function Picker() {
   return (
     <SafeAreaView style={s.sheet} edges={['bottom']}>
       <View style={s.header}>
-        <View style={{ width: 64 }} />
+        {isMulti ? (
+          <Pressable onPress={() => router.back()} hitSlop={10} style={s.leftTap}>
+            <Text style={s.cancel}>Cancel</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 72 }} />
+        )}
         <Text style={s.title} numberOfLines={1}>{title}</Text>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={s.cancelTap}>
-          <Text style={s.cancel}>Cancel</Text>
-        </Pressable>
+        {isMulti ? (
+          <Pressable onPress={done} hitSlop={10} style={s.donePill}>
+            <Text style={s.doneTxt}>Done</Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => router.back()} hitSlop={10} style={s.cancelTap}>
+            <Text style={s.cancel}>Cancel</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={s.searchWrap}>
@@ -147,21 +188,29 @@ export default function Picker() {
           )}
 
           {filtered.map(item => {
-            const on = item.id === selectedId;
+            const on = isMulti ? selected.has(item.id) : (item.id === selectedId);
             return (
-              <Pressable key={item.id} style={s.row} onPress={() => choose(item.id)}>
+              <Pressable
+                key={item.id}
+                style={s.row}
+                onPress={() => (isMulti ? toggle(item.id) : choose(item.id))}
+              >
+                {isMulti && (
+                  <View style={[s.box, on && s.boxOn]}>
+                    {on && <Text style={s.boxCheck}>✓</Text>}
+                  </View>
+                )}
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[s.rowName, on && s.rowNameOn]} numberOfLines={1}>
+                  <Text style={[s.rowName, on && !isMulti && s.rowNameOn]} numberOfLines={1}>
                     {item.name || 'Untitled'}
                   </Text>
                   {!!item.sku && <Text style={s.rowSub} numberOfLines={1}>SKU: {item.sku}</Text>}
                 </View>
-                {on && <Text style={s.check}>✓</Text>}
+                {on && !isMulti && <Text style={s.check}>✓</Text>}
               </Pressable>
             );
           })}
 
-          {/* Inline Add button — hugs the list when everything fits. */}
           {showAdd && !overflow && (
             <Pressable style={[s.addBtn, s.addBtnInline]} onPress={addNew}>
               <Text style={s.addBtnTxt}>{addLabel}</Text>
@@ -170,8 +219,6 @@ export default function Picker() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Pinned Add button — drops to the bottom, list scrolls behind it,
-          once the content is taller than the viewport. */}
       {showAdd && overflow && (
         <View style={s.footer}>
           <Pressable style={s.addBtn} onPress={addNew}>
@@ -195,8 +242,11 @@ function makeStyles(t) {
       paddingBottom: 16,
     },
     title: { fontSize: 16, fontWeight: '700', color: t.ink, flex: 1, textAlign: 'center' },
-    cancelTap: { width: 64, alignItems: 'flex-end' },
+    leftTap: { width: 72, alignItems: 'flex-start' },
+    cancelTap: { width: 72, alignItems: 'flex-end' },
     cancel: { color: t.inkSoft, fontSize: 15 },
+    donePill: { width: 72, alignItems: 'center', backgroundColor: t.tabIdleBg, paddingVertical: 7, borderRadius: 999 },
+    doneTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
 
     searchWrap: { paddingHorizontal: 16, paddingBottom: 14 },
     search: {
@@ -222,6 +272,14 @@ function makeStyles(t) {
     rowNameOn: { fontWeight: '700' },
     rowSub: { fontSize: 12, color: t.muted, marginTop: 2 },
     check: { fontSize: 18, color: t.ink, fontWeight: '700', marginLeft: 8 },
+
+    // Multi-select checkbox (white box, soft border when checked, black check).
+    box: {
+      width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: t.line,
+      backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    },
+    boxOn: { borderColor: '#B0B0B0' },
+    boxCheck: { color: t.ink, fontSize: 13, fontWeight: '600', lineHeight: 15 },
 
     addBtn: {
       padding: 14,

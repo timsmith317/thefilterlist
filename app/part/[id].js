@@ -1,23 +1,24 @@
 // app/part/[id].js — Part Detail.
 //
-// View and Edit modes share the same title metrics and spacing down to ON
-// HAND, so toggling edit/save doesn't shift the page.
-//   - title and titleInput both fontSize 26, same marginTop, no underline
-//   - the low-stock slot renders in BOTH modes (empty in edit) so the gap to
-//     ON HAND is identical
+// The PART now owns the replacement interval (the manufacturer's recommended
+// cadence, user-editable). It shows as the headline spec under the title:
+//   - view mode: "Every 90 days" (verbose, singular-aware)
+//   - edit mode: the number + Days/Months/Years roller (IntervalField), the
+//     same control used in the Filter editor. We derive {value, unit} from the
+//     stored day count on entering edit and convert back on save.
+// Because the interval lives here, every filter/stage that links this part
+// inherits this cadence — edit it once, everywhere updates.
 //
-// Threshold text reads "Alert when N or less".
+// View and Edit modes share the same title metrics and spacing so toggling
+// edit/save doesn't shift the page. The low-stock slot renders in BOTH modes
+// (empty in edit) so the gap below the title is identical.
 //
-// Delete Part now lives in EDIT mode only (was view mode). Matches the
-// pattern on the Filter Edit screen and iOS conventions — destructive
-// actions surface behind the explicit "I'm editing this" gate, not on
-// the casual view screen. Used By stays in view mode since it's
-// informational, not destructive.
+// Delete Part lives in EDIT mode only (matches Filter Edit / iOS conventions).
+// Used By stays in view mode (informational).
 //
 // Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
-// scrolls the focused input clear of the keyboard in edit mode (SKU /
-// REORDER URL sit low on the form). Requires <KeyboardProvider> in
-// app/_layout.js. Native module — needs a dev rebuild to take effect.
+// scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
+// in app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Linking, Alert } from 'react-native';
@@ -27,8 +28,19 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton, PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
-import { loadData, saveData, updatePart, deletePart, filtersUsingPart, isPartLow, addPartPhoto, removePartPhoto, MAX_PART_PHOTOS } from '../../data/store';
+import IntervalField from '../../components/IntervalField';
+import { loadData, saveData, updatePart, deletePart, filtersUsingPart, isPartLow, addPartPhoto, removePartPhoto, MAX_PART_PHOTOS, DEFAULT_INTERVAL_DAYS } from '../../data/store';
+import { intervalToDays, daysToInterval, INTERVAL_UNITS } from '../../lib/interval';
 import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/partPhotos';
+
+// "Every 90 days" / "Every 6 months" / "Every 1 year" (singular-aware).
+function verboseInterval(days) {
+  const { value, unit } = daysToInterval(days);
+  const u = INTERVAL_UNITS.find(x => x.key === unit) || INTERVAL_UNITS[0];
+  const word = u.label.toLowerCase();              // days / months / years
+  const singular = value === 1 ? word.replace(/s$/, '') : word;
+  return `Every ${value} ${singular}`;
+}
 
 export default function PartDetail() {
   const t = useTheme();
@@ -45,7 +57,10 @@ export default function PartDetail() {
       if (active) {
         setData(d);
         const p = d.parts.find(x => x.id === id);
-        if (p) setDraft({ ...p });
+        if (p) {
+          const { value, unit } = daysToInterval(p.intervalDays != null ? p.intervalDays : DEFAULT_INTERVAL_DAYS);
+          setDraft({ ...p, intervalValue: String(value), intervalUnit: unit });
+        }
       }
     });
     return () => { active = false; };
@@ -64,16 +79,20 @@ export default function PartDetail() {
 
   const filters = filtersUsingPart(data, part.id);
   const low = isPartLow(part);
+  const partInterval = part.intervalDays != null ? part.intervalDays : DEFAULT_INTERVAL_DAYS;
 
   const save = async () => {
+    const { intervalValue, intervalUnit, ...rest } = draft;
     const clean = {
-      ...draft,
+      ...rest,
+      intervalDays: intervalToDays(intervalValue, intervalUnit),
       onHand: Math.max(0, parseInt(draft.onHand, 10) || 0),
       lowStockThreshold: Math.max(0, parseInt(draft.lowStockThreshold, 10) || 0),
     };
     const next = updatePart(data, part.id, clean);
     setData(next);
-    setDraft({ ...clean });
+    const { value, unit } = daysToInterval(clean.intervalDays);
+    setDraft({ ...clean, intervalValue: String(value), intervalUnit: unit });
     await saveData(next);
     setEditing(false);
   };
@@ -152,14 +171,31 @@ export default function PartDetail() {
         )}
 
         {/* Low-stock slot renders in BOTH modes (empty in edit) so the gap to
-            ON HAND is identical and the page doesn't shift on save. */}
+            the first section is identical and the page doesn't shift on save. */}
         <View style={s.lowSlot}>
           {!editing && low && (
             <View style={s.lowPill}><Text style={s.lowPillTxt}>Low Stock</Text></View>
           )}
         </View>
 
-        <Text style={[s.label, s.firstLabel]}>ON HAND</Text>
+        {/* INTERVAL — the part's recommended replacement cadence, the headline
+            spec. Lives on the part so every linked filter inherits it. */}
+        <Text style={[s.label, s.firstLabel]}>REPLACE EVERY</Text>
+        {editing ? (
+          <IntervalField
+            value={draft.intervalValue}
+            unit={draft.intervalUnit}
+            onChangeValue={(v) => setDraft({ ...draft, intervalValue: v })}
+            onChangeUnit={(u) => setDraft({ ...draft, intervalUnit: u })}
+          />
+        ) : (
+          <Text style={s.value}>{verboseInterval(partInterval)}</Text>
+        )}
+        {editing && (
+          <Text style={s.hint}>Used by every filter linked to this part.</Text>
+        )}
+
+        <Text style={s.label}>ON HAND</Text>
         <View style={s.stepperRow}>
           <Pressable style={s.stepBtn} onPress={() => bump(-1)} hitSlop={6}><Text style={s.stepTxt}>−</Text></Pressable>
           <Text style={s.stepCount}>{part.onHand}</Text>
@@ -224,9 +260,7 @@ export default function PartDetail() {
           </>
         )}
 
-        {/* Delete Part: edit-mode only (was view-mode). Matches Filter Edit
-            and the iOS convention of putting destructive actions behind
-            the explicit Edit gate. */}
+        {/* Delete Part: edit-mode only. */}
         {editing && (
           <Pressable style={s.delBtn} onPress={askDelete}>
             <Text style={s.delTxt}>Delete Part</Text>
@@ -242,17 +276,13 @@ function makeStyles(t) {
     safe: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
 
-    // View and edit titles share the SAME font size (26), weight, top margin,
-    // and indent, so toggling modes doesn't shift the page. No underline.
     title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16 },
     titleInput: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16, paddingVertical: 0 },
 
-    // Tightened low-stock slot: small consistent gap above ON HAND in both
-    // modes. Reduced from height 22/marginTop 6 to shrink the empty space.
     lowSlot: { height: 22, marginTop: 2, paddingLeft: 16, justifyContent: 'center' },
 
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
-    // First section (ON HAND) sits closer to the title/badge above it.
+    // First section sits closer to the title/badge above it.
     firstLabel: { marginTop: 8 },
     value: { fontSize: 15, fontWeight: '600', color: t.ink, paddingLeft: 16 },
     input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },

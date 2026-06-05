@@ -6,9 +6,13 @@
 //   WORDMARK_COLOR: the color of "The Filter List" text.
 //     Forest green '#15803d' to match logo, near-black '#0f172a' for neutral,
 //     or sage greens like '#7c9885' for softer tone.
+//   PILL_NUDGE: vertical nudge (px) for the status pill on each card. It's the
+//     marginTop on the pill: 0 sits it at the top of the title row, NEGATIVE
+//     moves it UP, positive moves it down. Tune to taste.
 //
 const LOCKUP_NUDGE = -8;
 const WORDMARK_COLOR = '#15803d'; // soft sage green
+const PILL_NUDGE = -4;            // status-pill vertical nudge; negative = up
 
 // Card internal padding — the inset from the card edge to its inner
 // content (icon left, pill right). Title row, sub-text, and tabs row
@@ -29,6 +33,7 @@ import Wordmark from '../theme/Wordmark';
 import {
   loadData, dueSoonList, filtersForCategory, dueCount,
 } from '../data/store';
+import { formatInterval } from '../lib/interval';
 
 const LOGO_SIZE = 50;
 
@@ -91,19 +96,43 @@ export default function DueSoon() {
         {list.length === 0 && <Text style={s.empty}>No filters here yet.</Text>}
         {list.map(f => {
           const tone = t.status[f.status.key];
+          const multi = f.status.stageCount > 1;
+          const noParts = f.status.stageCount === 0;
           return (
             <Pressable key={f.id} style={s.card} onPress={() => router.push(`/filter/${f.id}`)}>
               {/* Icon chip top-aligned with the title (alignItems: flex-start on
                   the card), so single- and multi-line cards both look aligned. */}
               <View style={s.iconChip}><TypeIcon type={f.type} size={32} color={t.iconInk} /></View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.cardName} numberOfLines={1}>{f.name}</Text>
-                <Text style={s.cardMeta}>{f.asset?.name} · every {f.intervalDays}d</Text>
-              </View>
-              {/* Pill wrapped so it doesn't stretch vertically; sits at the top. */}
-              <View>
-                <View style={[s.pill, { backgroundColor: tone.pillBg }]}>
-                  <Text style={[s.pillTxt, { color: tone.pillInk }]}>{f.status.label}</Text>
+                {/* Title + status pill share the top line. The title stays a
+                    single line and truncates (we'd rather clip than wrap and
+                    grow the card). The pill is top-aligned and nudged by
+                    PILL_NUDGE. */}
+                <View style={s.topRow}>
+                  <Text style={s.cardName} numberOfLines={1}>{f.name}</Text>
+                  {noParts ? (
+                    <View style={[s.pill, { backgroundColor: t.tabIdleBg, marginTop: PILL_NUDGE }]}>
+                      <Text style={[s.pillTxt, { color: t.inkSoft }]}>No parts</Text>
+                    </View>
+                  ) : (
+                    <View style={[s.pill, { backgroundColor: tone.pillBg, marginTop: PILL_NUDGE }]}>
+                      <Text style={[s.pillTxt, { color: tone.pillInk }]}>{f.status.label}</Text>
+                    </View>
+                  )}
+                </View>
+                {/* Meta line, full width. For multi-stage the "N stages" badge
+                    sits at the RIGHT END of this same line — so it lands under
+                    the status pill, right-justified, WITHOUT adding any card
+                    height. The meta text truncates behind the badge if long. */}
+                <View style={s.metaRow}>
+                  <Text style={s.cardMeta} numberOfLines={1}>
+                    {f.asset?.name}{noParts ? '' : multi ? ' · varies' : ` · every ${formatInterval(f.intervalDays)}`}
+                  </Text>
+                  {multi && (
+                    <View style={s.stagesBadge}>
+                      <Text style={s.stagesBadgeTxt}>{f.status.stageCount} stages</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </Pressable>
@@ -164,15 +193,25 @@ function makeStyles(t) {
     listContent: { paddingHorizontal: t.space.lg, paddingTop: t.space.md, gap: 11 },
     empty: { padding: 24, textAlign: 'center', color: t.muted, fontStyle: 'italic' },
 
-    // alignItems: flex-start so the icon chip and status pill both align to
-    // the TOP of the card content, matching the title's top edge.
-    // padding uses CARD_PADDING so the title/sub/tabs alignment math
-    // above stays in sync if this ever changes.
+    // alignItems: flex-start so the icon chip and the title/pill row both align
+    // to the TOP of the card. padding uses CARD_PADDING so the title/sub/tabs
+    // alignment math above stays in sync if this ever changes.
     card: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, padding: CARD_PADDING, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: t.radius.card },
     iconChip: { width: 44, height: 44, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
 
-    cardName: { ...t.type.body, color: t.ink },
-    cardMeta: { ...t.type.meta, color: t.muted, marginTop: 2 },
+    // Title + status pill on one row, top-aligned. Title takes the remaining
+    // width and truncates; pill hugs the right edge.
+    topRow: { flexDirection: 'row', alignItems: 'flex-start' },
+    cardName: { ...t.type.body, color: t.ink, flex: 1, marginRight: 10 },
+
+    // Meta line: asset (+ interval for single-stage) takes the row and
+    // truncates; the "N stages" badge, when present, is pinned to the right
+    // edge so it sits directly under the status pill.
+    metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    cardMeta: { ...t.type.meta, color: t.muted, flex: 1, marginRight: 8 },
+    stagesBadge: { backgroundColor: t.tabIdleBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+    stagesBadgeTxt: { fontSize: 11, fontWeight: '700', color: t.inkSoft },
+
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },
   });
