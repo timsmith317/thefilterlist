@@ -86,7 +86,7 @@ export const type = {
   kicker:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
   // Display title — large hero text. Available if a screen wants it.
   title:       { fontSize: 30, fontWeight: '800', letterSpacing: 0.5 },
-  // Canonical screen title — what "Due Soon", "Settings", "Filter detail"
+  // Canonical screen title — what "Due Soon", "Settings", "Device detail"
   // and every other screen header should use. Spread it with the spread
   // operator: `title: { ...t.type.screenTitle, color: t.ink, ... }`.
   screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5 },

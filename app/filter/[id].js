@@ -1,66 +1,76 @@
 // app/filter/[id].js — Filter Detail.
 //
-// SINGLE-STAGE filters render exactly as before: a data card (Location / Type /
-// Replace every / Last replaced / Next due), one PART card, and a one-tap
-// Mark Replaced that opens the date picker.
+// The FILTER now owns the replacement interval (the manufacturer's recommended
+// cadence, user-editable). It shows as the headline spec under the title:
+//   - view mode: "Every 90 days" (verbose, singular-aware)
+//   - edit mode: the number + Days/Months/Years roller (IntervalField), the
+//     same control used in the Device editor. We derive {value, unit} from the
+//     stored day count on entering edit and convert back on save.
+// Because the interval lives here, every device/stage that links this filter
+// inherits this cadence — edit it once, everywhere updates.
 //
-// MULTI-STAGE filters render a STAGES section instead: the data card carries
-// Location / Type / Stages / Next due (soonest), then one card per stage —
-// each with its own status pill, linked part (SKU / on-hand / low-stock),
-// its own interval + next-due, and tap-through to the part. Mark Replaced
-// opens the per-stage sheet (check what you swapped, pick a date).
+// View and Edit modes share the same title metrics and spacing so toggling
+// edit/save doesn't shift the page. The low-stock slot renders in BOTH modes
+// (empty in edit) so the gap below the title is identical.
 //
-// Intervals display in human units (1y / 6m / 30d) via lib/interval.
+// Delete Filter lives in EDIT mode only (matches Device Edit / iOS conventions).
+// Used By stays in view mode (informational).
 //
-// Notes (authored on Edit; affordance shown only when notes exist):
-//   - single, NO part: right-justified "Notes ›" on its own line below the card.
-//   - single, HAS part: "Notes ›" rides on the PART header row.
-//   - multi: "Notes ›" rides on the STAGES header row.
-// Tapping opens NotesModal (read-only, dimmed sheet, Copy pill).
+// Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
+// scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
+// in app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TextInput, Pressable, StyleSheet, Linking, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
-import { TypeIcon } from '../../theme/Icons';
 import { BackButton, PillButton } from '../../components/HeaderBits';
-import DatePickerModal from '../../components/DatePickerModal';
-import MarkReplacedSheet from '../../components/MarkReplacedSheet';
-import NotesModal from '../../components/NotesModal';
-import {
-  loadData, saveData, statusOf, stagesWithStatus, markReplaced, getPart, isPartLow,
-  FILTER_TYPES,
-} from '../../data/store';
-import { formatInterval } from '../../lib/interval';
+import PhotoStrip from '../../components/PhotoStrip';
+import PhotoCropper from '../../components/PhotoCropper';
+import IntervalField from '../../components/IntervalField';
+import { loadData, saveData, updateFilter, deleteFilter, devicesUsingFilter, isFilterLow, addFilterPhoto, removeFilterPhoto, FILTER_TYPES, MAX_FILTER_PHOTOS, DEFAULT_INTERVAL_DAYS } from '../../data/store';
+import { intervalToDays, daysToInterval, INTERVAL_UNITS } from '../../lib/interval';
+import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/filterPhotos';
+
+// "Every 90 days" / "Every 6 months" / "Every 1 year" (singular-aware).
+function verboseInterval(days) {
+  const { value, unit } = daysToInterval(days);
+  const u = INTERVAL_UNITS.find(x => x.key === unit) || INTERVAL_UNITS[0];
+  const word = u.label.toLowerCase();              // days / months / years
+  const singular = value === 1 ? word.replace(/s$/, '') : word;
+  return `Every ${value} ${singular}`;
+}
 
 export default function FilterDetail() {
   const t = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
-
-  // Hug-then-pin Mark Replaced button (matches the settings screens): inline
-  // after the content when it fits, pinned to a bottom footer when it overflows.
-  const [viewportH, setViewportH] = useState(0);
-  const [contentH, setContentH] = useState(0);
-  const [footerH, setFooterH] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const [cropAsset, setCropAsset] = useState(null);
+  const s = makeStyles(t);
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    loadData().then(d => { if (active) setData(d); });
+    loadData().then(d => {
+      if (active) {
+        setData(d);
+        const p = d.filters.find(x => x.id === id);
+        if (p) {
+          const { value, unit } = daysToInterval(p.intervalDays != null ? p.intervalDays : DEFAULT_INTERVAL_DAYS);
+          setDraft({ ...p, intervalValue: String(value), intervalUnit: unit });
+        }
+      }
+    });
     return () => { active = false; };
-  }, []));
+  }, [id]));
 
-  const s = makeStyles(t);
-
-  if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
-  const f = data.filters.find(x => x.id === id);
-  if (!f) {
+  if (!data || !draft) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  const filter = data.filters.find(x => x.id === id);
+  if (!filter) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.head}><BackButton onPress={() => router.back()} /><View /></View>
@@ -69,246 +79,228 @@ export default function FilterDetail() {
     );
   }
 
-  const status = statusOf(f, data);         // headline = soonest-due stage
-  const tone = t.status[status.key];
-  const stages = stagesWithStatus(f, data); // each {…, status}, soonest first
-  const multi = stages.length > 1;
-  const noStages = stages.length === 0;     // no parts -> no schedule
-  const s0 = stages[0] || null;
+  const devices = devicesUsingFilter(data, filter.id);
+  const low = isFilterLow(filter);
+  const filterInterval = filter.intervalDays != null ? filter.intervalDays : DEFAULT_INTERVAL_DAYS;
 
-  const asset = data.assets.find(a => a.id === f.assetId);
-  const part = getPart(data, s0 ? s0.partId : null);   // single-stage part
-  const partLow = isPartLow(part);
-  const hasNotes = !!(f.notes && f.notes.trim());
-  const fmt = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-
-  // Single-stage: one tap → date picker → reset the (only) stage.
-  const onConfirmDate = async (date) => {
-    const safe = date > new Date() ? new Date() : date;
-    const next = markReplaced(data, f.id, safe.toISOString());
-    setData(next);
-    setPickerOpen(false);
-    await saveData(next);
-  };
-
-  // Multi-stage: sheet returns the checked stage ids + a date.
-  const onConfirmSheet = async (stageIds, date) => {
-    const safe = date > new Date() ? new Date() : date;
-    const next = markReplaced(data, f.id, safe.toISOString(), stageIds);
-    setData(next);
-    setSheetOpen(false);
-    await saveData(next);
-  };
-
-  const onMark = () => (multi ? setSheetOpen(true) : setPickerOpen(true));
-  const overflow = viewportH > 0 && contentH > viewportH;
-
-  const sheetStages = stages.map((st, i) => {
-    const p = getPart(data, st.partId);
-    return {
-      id: st.id,
-      label: p ? (p.name || 'Untitled part') : `Stage ${i + 1}`,
-      sub: `Every ${formatInterval(st.intervalDays)} · Next ${fmt(st.status.due)}`,
-      status: st.status,
+  const save = async () => {
+    const { intervalValue, intervalUnit, ...rest } = draft;
+    const clean = {
+      ...rest,
+      intervalDays: intervalToDays(intervalValue, intervalUnit),
+      onHand: Math.max(0, parseInt(draft.onHand, 10) || 0),
+      lowStockThreshold: Math.max(0, parseInt(draft.lowStockThreshold, 10) || 0),
     };
-  });
+    const next = updateFilter(data, filter.id, clean);
+    setData(next);
+    const { value, unit } = daysToInterval(clean.intervalDays);
+    setDraft({ ...clean, intervalValue: String(value), intervalUnit: unit });
+    await saveData(next);
+    setEditing(false);
+  };
 
-  const NotesAffordance = ({ style }) => (
-    <Pressable
-      onPress={() => setNotesOpen(true)}
-      hitSlop={{ top: 8, bottom: 8, left: 24, right: 8 }}
-      style={style}
-    >
-      <View style={s.notesInner}>
-        <Text style={s.notesLinkTxt}>Notes</Text>
-        <Text style={s.notesChev}>›</Text>
-      </View>
-    </Pressable>
-  );
+  const bump = async (delta) => {
+    const newOn = Math.max(0, (filter.onHand || 0) + delta);
+    const next = updateFilter(data, filter.id, { onHand: newOn });
+    setData(next);
+    setDraft({ ...draft, onHand: newOn });
+    await saveData(next);
+  };
+
+  const openLink = () => { if (filter.reorderUrl) Linking.openURL(filter.reorderUrl); };
+
+  const askDelete = () => {
+    Alert.alert(
+      'Delete filter?',
+      devices.length
+        ? `This filter is used by ${devices.length} device${devices.length > 1 ? 's' : ''}. They will keep their settings but lose the filter link.`
+        : 'This will remove the filter. No devices reference it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          for (const u of (filter.photos || [])) await deleteFile(u);
+          const n = deleteFilter(data, filter.id); await saveData(n); router.back();
+        } },
+      ]
+    );
+  };
+
+  const onPickPhoto = async (source) => {
+    if ((filter.photos || []).length >= MAX_FILTER_PHOTOS) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_FILTER_PHOTOS} photos per filter.`);
+      return;
+    }
+    const asset = source === 'camera' ? await takePhoto() : await pickFromLibrary();
+    if (!asset) return;
+    setCropAsset(asset);
+  };
+
+  const onCroppedPhoto = async (uri) => {
+    setCropAsset(null);
+    if (!uri) return;
+    const next = addFilterPhoto(data, filter.id, uri);
+    setData(next);
+    await saveData(next);
+  };
+
+  const onSaveToPhotos = async (uri) => {
+    const ok = await saveToPhotos(uri);
+    if (ok) Alert.alert('Saved', 'Photo saved to your library.');
+  };
+
+  const onDeletePhoto = async (index) => {
+    const uri = (filter.photos || [])[index];
+    const next = removeFilterPhoto(data, filter.id, index);
+    setData(next);
+    await saveData(next);
+    await deleteFile(uri);
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <BackButton onPress={() => router.back()} />
-        <PillButton label="Edit" onPress={() => router.push(`/filter/edit/${f.id}`)} />
+        {editing ? (
+          <PillButton label="Save" onPress={save} />
+        ) : (
+          <PillButton label="Edit" onPress={() => setEditing(true)} />
+        )}
       </View>
 
-      <ScrollView
-        onLayout={e => setViewportH(e.nativeEvent.layout.height)}
-        onContentSizeChange={(w, h) => setContentH(h)}
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: (overflow ? footerH : 0) + 40, paddingTop: 4 }}
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        bottomOffset={20}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={s.bigChip}><TypeIcon type={f.type} size={52} color={t.iconInk} /></View>
-        <Text style={s.title}>{f.name}</Text>
-        {noStages ? (
-          <View style={[s.pill, { backgroundColor: t.tabIdleBg, alignSelf: 'flex-start', marginTop: 8, marginLeft: 16 }]}>
-            <Text style={[s.pillTxt, { color: t.inkSoft }]}>No parts</Text>
-          </View>
+        {editing ? (
+          <TextInput value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} placeholder="Name" placeholderTextColor={t.muted} style={s.titleInput} />
         ) : (
-          <View style={[s.pill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start', marginTop: 8, marginLeft: 16 }]}>
-            <Text style={[s.pillTxt, { color: tone.pillInk }]}>{status.label}</Text>
-          </View>
+          <Text style={s.title}>{filter.name || 'Untitled filter'}</Text>
         )}
 
-        <View style={s.rows}>
-          <Row t={t} k="Location" v={asset?.name || '—'} />
-          <Row t={t} k="Type" v={FILTER_TYPES[f.type]?.label || 'Other'} last={noStages} />
-          {noStages ? null : multi ? (
-            <>
-              <Row t={t} k="Stages" v={`${stages.length}`} />
-              <Row t={t} k="Next due" v={fmt(status.due)} last />
-            </>
-          ) : (
-            <>
-              <Row t={t} k="Replace every" v={formatInterval(s0.intervalDays)} />
-              <Row t={t} k="Last replaced" v={fmt(s0.lastReplaced)} />
-              <Row t={t} k="Next due" v={fmt(status.due)} last />
-            </>
+        {/* Low-stock slot renders in BOTH modes (empty in edit) so the gap to
+            the first section is identical and the page doesn't shift on save. */}
+        <View style={s.lowSlot}>
+          {!editing && low && (
+            <View style={s.lowPill}><Text style={s.lowPillTxt}>Low Stock</Text></View>
           )}
         </View>
 
-        {noStages ? (
-          <>
-            <View style={s.emptyParts}>
-              <Text style={s.emptyPartsTxt}>
-                No parts linked yet. Add one from Edit to track replacements, or
-                use Notes to track this filter by hand.
-              </Text>
-            </View>
-            {hasNotes && (
-              <View style={s.notesRow}>
-                <NotesAffordance />
-              </View>
-            )}
-          </>
-        ) : multi ? (
-          <>
-            <View style={s.partHeaderRow}>
-              <Text style={s.partLabel}>STAGES</Text>
-              {hasNotes && <NotesAffordance style={s.notesNudge} />}
-            </View>
-            {stages.map((st, i) => (
-              <StageCard
-                key={st.id}
-                t={t} s={s} stage={st} index={i}
-                part={getPart(data, st.partId)}
-                fmt={fmt}
-                onPress={(pid) => router.push(`/part/${pid}`)}
-              />
-            ))}
-          </>
+        {/* TYPE — what kind of device element this filter is (water / air /
+            other). Lives on the filter; the device's icon derives from this. */}
+        <Text style={[s.label, s.firstLabel]}>TYPE</Text>
+        {editing ? (
+          <View style={s.typeRow}>
+            {Object.entries(FILTER_TYPES).map(([k, v]) => {
+              const on = (draft.type || 'other') === k;
+              return (
+                <Pressable key={k} onPress={() => setDraft({ ...draft, type: k })} style={[s.typeChip, on && s.typeChipOn]}>
+                  <Text style={[s.typeChipTxt, on && s.typeChipTxtOn]}>{v.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         ) : (
+          <Text style={s.value}>{FILTER_TYPES[filter.type]?.label || 'Other'}</Text>
+        )}
+
+        {/* INTERVAL — the filter's recommended replacement cadence, the headline
+            spec. Lives on the filter so every linked device inherits it. */}
+        <Text style={s.label}>REPLACE EVERY</Text>
+        {editing ? (
+          <IntervalField
+            value={draft.intervalValue}
+            unit={draft.intervalUnit}
+            onChangeValue={(v) => setDraft({ ...draft, intervalValue: v })}
+            onChangeUnit={(u) => setDraft({ ...draft, intervalUnit: u })}
+          />
+        ) : (
+          <Text style={s.value}>{verboseInterval(filterInterval)}</Text>
+        )}
+        {editing && (
+          <Text style={s.hint}>Used by every device linked to this filter.</Text>
+        )}
+
+        <Text style={s.label}>ON HAND</Text>
+        <View style={s.stepperRow}>
+          <Pressable style={s.stepBtn} onPress={() => bump(-1)} hitSlop={6}><Text style={s.stepTxt}>−</Text></Pressable>
+          <Text style={s.stepCount}>{filter.onHand}</Text>
+          <Pressable style={s.stepBtn} onPress={() => bump(1)} hitSlop={6}><Text style={s.stepTxt}>+</Text></Pressable>
+        </View>
+
+        <Text style={s.label}>LOW-STOCK THRESHOLD</Text>
+        {editing ? (
+          <TextInput
+            value={String(draft.lowStockThreshold)}
+            onChangeText={(v) => setDraft({ ...draft, lowStockThreshold: v.replace(/[^0-9]/g, '') })}
+            keyboardType="number-pad"
+            style={s.input}
+          />
+        ) : (
+          <Text style={s.value}>Alert when {filter.lowStockThreshold} or less</Text>
+        )}
+
+        <Text style={s.label}>SKU</Text>
+        {editing ? (
+          <TextInput value={draft.sku} onChangeText={(v) => setDraft({ ...draft, sku: v })} placeholder="e.g. EDR1RXD1" placeholderTextColor={t.muted} style={s.input} autoCapitalize="characters" />
+        ) : (
+          <Text style={s.value}>{filter.sku || '—'}</Text>
+        )}
+
+        <Text style={s.label}>REORDER URL</Text>
+        {editing ? (
+          <TextInput value={draft.reorderUrl} onChangeText={(v) => setDraft({ ...draft, reorderUrl: v })} placeholder="https://..." placeholderTextColor={t.muted} style={s.input} autoCapitalize="none" autoCorrect={false} />
+        ) : filter.reorderUrl ? (
+          <Pressable onPress={openLink} style={s.openLink}>
+            <Text style={s.openLinkTxt} numberOfLines={1}>{filter.reorderUrl}</Text>
+            <Text style={s.openLinkArrow}>↗</Text>
+          </Pressable>
+        ) : (
+          <Text style={s.value}>—</Text>
+        )}
+
+        <Text style={s.label}>PHOTOS</Text>
+        <View style={{ paddingLeft: 16 }}>
+          <PhotoStrip
+            photos={filter.photos || []}
+            max={MAX_FILTER_PHOTOS}
+            onPick={(source) => onPickPhoto(source)}
+            onSaveToPhotos={onSaveToPhotos}
+            onDelete={onDeletePhoto}
+          />
+        </View>
+        <Text style={s.hint}>Up to {MAX_FILTER_PHOTOS} reference photos.</Text>
+
+        {/* Used By: informational, view-mode only — unchanged. */}
+        {!editing && devices.length > 0 && (
           <>
-            {/* No part → Notes on its own line below the card. */}
-            {hasNotes && !part && (
-              <View style={s.notesRow}>
-                <NotesAffordance />
-              </View>
-            )}
-            {part && (
-              <>
-                <View style={s.partHeaderRow}>
-                  <Text style={s.partLabel}>PART</Text>
-                  {hasNotes && <NotesAffordance style={s.notesNudge} />}
-                </View>
-                <Pressable style={s.partCard} onPress={() => router.push(`/part/${part.id}`)}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.partName} numberOfLines={1}>{part.name || 'Untitled part'}</Text>
-                    {!!part.sku && <Text style={s.partMeta}>SKU: {part.sku}</Text>}
-                    <View style={s.partStockRow}>
-                      <Text style={s.partStock}>On hand: {part.onHand}</Text>
-                      {partLow && (
-                        <View style={s.lowPill}><Text style={s.lowPillTxt}>Low stock</Text></View>
-                      )}
-                    </View>
-                  </View>
+            <Text style={s.label}>USED BY ({devices.length})</Text>
+            <View style={s.usedBox}>
+              {devices.map(f => (
+                <Pressable key={f.id} style={s.usedRow} onPress={() => router.push(`/device/${f.id}`)}>
+                  <Text style={s.usedTxt}>{f.name}</Text>
                   <Text style={s.chev}>›</Text>
                 </Pressable>
-              </>
-            )}
+              ))}
+            </View>
           </>
         )}
 
-        {!noStages && !overflow && (
-          <Pressable
-            style={[s.markBtn, (!multi && hasNotes && !part) && s.markBtnNotesTop]}
-            onPress={onMark}
-          >
-            <Text style={s.markBtnTxt}>✓ Mark Replaced</Text>
+        {/* Delete Filter: edit-mode only. */}
+        {editing && (
+          <Pressable style={s.delBtn} onPress={askDelete}>
+            <Text style={s.delTxt}>Delete Filter</Text>
           </Pressable>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
-      {!noStages && overflow && (
-        <View
-          style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
-          onLayout={e => setFooterH(e.nativeEvent.layout.height)}
-        >
-          <Pressable style={[s.markBtn, s.markBtnPinned]} onPress={onMark}>
-            <Text style={s.markBtnTxt}>✓ Mark Replaced</Text>
-          </Pressable>
-        </View>
-      )}
-
-      <DatePickerModal
-        visible={pickerOpen}
-        initialDate={new Date()}
-        maximumDate={new Date()}
-        title="Install Date"
-        onCancel={() => setPickerOpen(false)}
-        onConfirm={onConfirmDate}
-      />
-
-      <MarkReplacedSheet
-        visible={sheetOpen}
-        stages={sheetStages}
-        onCancel={() => setSheetOpen(false)}
-        onConfirm={onConfirmSheet}
-      />
-
-      <NotesModal
-        visible={notesOpen}
-        notes={f.notes || ''}
-        title="Notes"
-        onCancel={() => setNotesOpen(false)}
+      <PhotoCropper
+        visible={!!cropAsset}
+        asset={cropAsset}
+        onCancel={() => setCropAsset(null)}
+        onDone={onCroppedPhoto}
       />
     </SafeAreaView>
-  );
-}
-
-// One stage in a multi-stage filter. Tappable when it has a linked part.
-// Mirrors the single-stage PART card: a [content | chevron] row, with the
-// Low-stock pill top-right (the headline status already lives at the page top,
-// so a per-stage status pill here just adds noise).
-function StageCard({ t, s, stage, index, part, fmt, onPress }) {
-  const low = isPartLow(part);
-  const title = part ? (part.name || 'Untitled part') : `Stage ${index + 1}`;
-
-  const Body = (
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <View style={s.stageTop}>
-        <Text style={s.partName} numberOfLines={1}>{title}</Text>
-        {low && <View style={s.lowPill}><Text style={s.lowPillTxt}>Low stock</Text></View>}
-      </View>
-      {part && !!part.sku && <Text style={s.partMeta}>SKU: {part.sku}</Text>}
-      <Text style={s.stageSched}>Every {formatInterval(stage.intervalDays)} · Next {fmt(stage.status.due)}</Text>
-      {part
-        ? <Text style={s.stageStock}>On hand: {part.onHand}</Text>
-        : <Text style={s.noPart}>No part linked</Text>}
-    </View>
-  );
-
-  return part
-    ? <Pressable style={s.stageCard} onPress={() => onPress(part.id)}>{Body}<Text style={s.chev}>›</Text></Pressable>
-    : <View style={s.stageCard}>{Body}</View>;
-}
-
-function Row({ t, k, v, last }) {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 13, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.line }}>
-      <Text style={{ color: t.muted, fontSize: 14 }}>{k}</Text>
-      <Text style={{ color: t.ink, fontSize: 14, fontWeight: '600', maxWidth: '60%', textAlign: 'right' }}>{v}</Text>
-    </View>
   );
 }
 
@@ -317,49 +309,42 @@ function makeStyles(t) {
     safe: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
 
-    bigChip: { width: 76, height: 76, borderRadius: 18, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginLeft: 16 },
-    title: { ...t.type.screenTitle, color: t.ink, marginTop: 14, paddingLeft: 16 },
+    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16 },
+    titleInput: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16, paddingVertical: 0 },
 
-    pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
-    pillTxt: { ...t.type.pill },
+    lowSlot: { height: 22, marginTop: 2, paddingLeft: 16, justifyContent: 'center' },
 
-    rows: { marginTop: 22, backgroundColor: t.card, borderRadius: 14, paddingHorizontal: 16, borderWidth: 1, borderColor: t.line },
+    label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
+    // First section sits closer to the title/badge above it.
+    firstLabel: { marginTop: 8 },
+    value: { fontSize: 15, fontWeight: '600', color: t.ink, paddingLeft: 16 },
+    typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: 16 },
+    typeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
+    typeChipOn: { backgroundColor: t.tabIdleBg },
+    typeChipTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    typeChipTxtOn: { color: t.ink },
+    input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
 
-    notesRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 16, marginTop: 14 },
+    stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingLeft: 16 },
+    stepBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.tabIdleBg, alignItems: 'center', justifyContent: 'center' },
+    stepTxt: { fontSize: 24, fontWeight: '700', color: t.ink },
+    stepCount: { fontSize: 22, fontWeight: '800', color: t.ink, minWidth: 40, textAlign: 'center' },
 
-    partHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 8, paddingHorizontal: 16 },
-    partLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase' },
+    openLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 13, borderRadius: 10, backgroundColor: t.tabIdleBg },
+    openLinkTxt: { color: t.ink, fontSize: 14, flex: 1, marginRight: 8 },
+    openLinkArrow: { color: t.inkSoft, fontSize: 18, fontWeight: '700' },
 
-    notesNudge: { transform: [{ translateY: -16 }] },
+    lowPill: { alignSelf: 'flex-start', backgroundColor: t.status.amb.pillBg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
 
-    notesInner: { alignSelf: 'flex-end' },
-    notesLinkTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
-    notesChev: { position: 'absolute', left: '100%', marginLeft: 4, top: -1, color: t.muted, fontSize: 17, lineHeight: 18, fontWeight: '700' },
+    hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 16 },
 
-    partCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14 },
-    emptyParts: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 16, marginTop: 4 },
-    emptyPartsTxt: { fontSize: 14, color: t.muted, lineHeight: 20 },
-    partName: { fontSize: 15, fontWeight: '700', color: t.ink, flex: 1, minWidth: 0 },
-    partMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
-    partStockRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-    partStock: { fontSize: 12.5, color: t.inkSoft, fontWeight: '600' },
-    lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
-    chev: { fontSize: 22, color: t.muted, marginLeft: 8 },
+    usedBox: { backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
+    usedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.line },
+    usedTxt: { fontSize: 14, color: t.ink, fontWeight: '600' },
+    chev: { fontSize: 22, color: t.muted },
 
-    // Multi-stage cards. Stacked with a small gap between them.
-    stageCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14, marginBottom: 10, marginHorizontal: 16 },
-    stageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-    stageSched: { fontSize: 12.5, color: t.inkSoft, fontWeight: '600', marginTop: 6 },
-    stageStock: { fontSize: 12.5, color: t.muted, fontWeight: '500', marginTop: 5 },
-    noPart: { fontSize: 12.5, color: t.muted, fontStyle: 'italic', marginTop: 6 },
-
-    markBtn: { marginTop: 22, marginHorizontal: 16, backgroundColor: t.tabIdleBg, padding: 14, borderRadius: t.radius.btn, alignItems: 'center' },
-    markBtnNotesTop: { marginTop: 14 },
-    markBtnPinned: { marginTop: 0 },
-    markBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
-
-    // Pinned footer bar (opaque so content scrolls behind it cleanly).
-    footer: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: t.bg, paddingHorizontal: 18, paddingTop: 10 },
+    delBtn: { marginTop: 28, padding: 12, alignItems: 'center' },
+    delTxt: { color: '#dc2626', fontSize: 14 },
   });
 }

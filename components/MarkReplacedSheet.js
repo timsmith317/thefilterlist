@@ -1,7 +1,7 @@
 // components/MarkReplacedSheet.js — per-stage Mark Replaced bottom sheet.
 //
-// Multi-stage filters open this instead of going straight to a date picker.
-//   Phase 'select' — a checklist of the filter's stages (pre-checked: the ones
+// Multi-stage devices open this instead of going straight to a date picker.
+//   Phase 'select' — a checklist of the device's stages (pre-checked: the ones
 //     currently due or overdue; if none are due, all are checked) plus a
 //     "Replaced on" date row. Done applies the chosen date to ONLY the checked
 //     stages and recalculates only their due dates.

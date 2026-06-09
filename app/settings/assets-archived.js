@@ -21,7 +21,7 @@ import {
   loadData, saveData,
   setAssetArchived,
   deleteAsset,
-  filtersForAsset,
+  devicesForAsset,
 } from '../../data/store';
 
 export default function ArchivedAssetsSettings() {
@@ -73,9 +73,9 @@ export default function ArchivedAssetsSettings() {
 
   // Step 2a: Restore — confirm + restore.
   const onUnarchive = (asset) => {
-    const filterCount = filtersForAsset(data, asset.id).length;
-    const msg = filterCount > 0
-      ? `Restore "${asset.name}"? Its ${filterCount} filter${filterCount === 1 ? '' : 's'} will be visible again.`
+    const deviceCount = devicesForAsset(data, asset.id).length;
+    const msg = deviceCount > 0
+      ? `Restore "${asset.name}"? Its ${deviceCount} device${deviceCount === 1 ? '' : 's'} will be visible again.`
       : `Restore "${asset.name}"?`;
     Alert.alert('Restore Asset', msg, [
       { text: 'Cancel', style: 'cancel' },
@@ -89,11 +89,11 @@ export default function ArchivedAssetsSettings() {
     ]);
   };
 
-  // Step 2b: Delete — destructive confirm + delete (asset + its filters).
+  // Step 2b: Delete — destructive confirm + delete (asset + its devices).
   const onDelete = (asset) => {
-    const filterCount = filtersForAsset(data, asset.id).length;
-    const headline = filterCount > 0
-      ? `Delete "${asset.name}" and its ${filterCount} filter${filterCount === 1 ? '' : 's'}?`
+    const deviceCount = devicesForAsset(data, asset.id).length;
+    const headline = deviceCount > 0
+      ? `Delete "${asset.name}" and its ${deviceCount} device${deviceCount === 1 ? '' : 's'}?`
       : `Delete "${asset.name}"?`;
     const msg = `${headline}\n\nBack up your data first if needed — this cannot be undone.`;
     Alert.alert('Delete Forever', msg, [
@@ -110,13 +110,13 @@ export default function ArchivedAssetsSettings() {
   };
 
   // Delete everything in the archive at once — same destructive warning,
-  // applied across all archived assets (and their filters).
+  // applied across all archived assets (and their devices).
   const onDeleteAll = () => {
     const count = archived.length;
     if (!count) return;
-    const totalFilters = archived.reduce((sum, a) => sum + filtersForAsset(data, a.id).length, 0);
-    const headline = totalFilters > 0
-      ? `Delete all ${count} archived asset${count === 1 ? '' : 's'} and their ${totalFilters} filter${totalFilters === 1 ? '' : 's'}?`
+    const totalDevices = archived.reduce((sum, a) => sum + devicesForAsset(data, a.id).length, 0);
+    const headline = totalDevices > 0
+      ? `Delete all ${count} archived asset${count === 1 ? '' : 's'} and their ${totalDevices} device${totalDevices === 1 ? '' : 's'}?`
       : `Delete all ${count} archived asset${count === 1 ? '' : 's'}?`;
     const msg = `${headline}\n\nBack up your data first if needed — this cannot be undone.`;
     Alert.alert('Delete Forever', msg, [
@@ -157,7 +157,7 @@ export default function ArchivedAssetsSettings() {
 
         {archived.map(asset => {
           const cat = categories.find(c => c.id === asset.categoryId);
-          const filterCount = filtersForAsset(data, asset.id).length;
+          const deviceCount = devicesForAsset(data, asset.id).length;
           return (
             <Pressable
               key={asset.id}
@@ -167,7 +167,7 @@ export default function ArchivedAssetsSettings() {
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.cardName} numberOfLines={1}>{asset.name}</Text>
                 <Text style={s.cardMeta} numberOfLines={1}>
-                  {cat ? cat.name : 'Uncategorized'} · {filterCount} filter{filterCount === 1 ? '' : 's'}
+                  {cat ? cat.name : 'Uncategorized'} · {deviceCount} device{deviceCount === 1 ? '' : 's'}
                 </Text>
               </View>
               <Text style={s.chev}>{'\u203A'}</Text>

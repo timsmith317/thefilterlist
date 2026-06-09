@@ -10,7 +10,7 @@
 //   anything. We then animate only the sheet ourselves via Animated.View
 //   with a translateY transform. This separates dim from slide:
 //
-//     - Dim is part of the modalRoot View — when the Modal is mounted,
+//     - Dim is filter of the modalRoot View — when the Modal is mounted,
 //       the dim is instantly on; when unmounted, instantly off. No
 //       fade, no slide.
 //     - Sheet slides up on open, slides down on close.

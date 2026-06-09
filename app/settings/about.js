@@ -304,7 +304,7 @@ export default function AboutSettings() {
         </View>
 
         <Text style={s.tagline}>
-          Track every filter across your Home, Auto, and Work.
+          Track every device across your Home, Auto, and Work.
         </Text>
 
         <View style={s.spacer} />

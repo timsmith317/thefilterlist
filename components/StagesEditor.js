@@ -1,11 +1,11 @@
 // components/StagesEditor.js — the per-stage schedule editor shared by New and
-// Edit Filter.
+// Edit Device.
 //
 // Progressive disclosure:
-//   - ONE stage: a plain INTERVAL + PART pair (looks like the old single
-//     schedule form) plus a "+ Add stage" affordance. Most filters stay here.
+//   - ONE stage: a plain INTERVAL + FILTER pair (looks like the old single
+//     schedule form) plus a "+ Add stage" affordance. Most devices stay here.
 //   - TWO+ stages: each stage becomes a titled block ("Stage N") with its own
-//     interval, its own part, and a Remove control, separated by dividers.
+//     interval, its own filter, and a Remove control, separated by dividers.
 //
 // INTERVAL layout: the number field fills the row (flex), then a centered,
 // borderless unit label showing ONE unit at a time, then an up/down chevron
@@ -21,7 +21,7 @@
 // it can't revert.
 //
 // Presentational only: the parent owns the draft stages and passes handlers.
-// Part selection is delegated up via onPickPart(stageId).
+// Filter selection is delegated up via onPickFilter(stageId).
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -132,21 +132,21 @@ const s_roller = StyleSheet.create({
 
 export default function StagesEditor({
   stages,
-  parts,
+  filters,
   onSetValue,
   onSetUnit,
   onAddStage,
   onRemoveStage,
-  onPickPart,
+  onPickFilter,
 }) {
   const t = useTheme();
   const s = makeStyles(t);
   const multi = stages.length > 1;
 
-  const partName = (id) => {
+  const filterName = (id) => {
     if (!id) return null;
-    const p = parts.find(x => x.id === id);
-    return p ? (p.name || 'Untitled part') : null;
+    const p = filters.find(x => x.id === id);
+    return p ? (p.name || 'Untitled filter') : null;
   };
 
   // Number field fills the row; unit roller + right-justified chevrons follow.
@@ -166,10 +166,10 @@ export default function StagesEditor({
     </View>
   );
 
-  const partRow = (st) => {
-    const name = partName(st.partId);
+  const filterRow = (st) => {
+    const name = filterName(st.filterId);
     return (
-      <Pressable style={s.pickerRow} onPress={() => onPickPart(st.id)}>
+      <Pressable style={s.pickerRow} onPress={() => onPickFilter(st.id)}>
         <Text style={[s.pickerValue, !name && s.pickerPlaceholder]} numberOfLines={1}>
           {name || 'None'}
         </Text>
@@ -185,9 +185,9 @@ export default function StagesEditor({
         <Text style={s.label}>INTERVAL</Text>
         {intervalRow(st)}
 
-        <Text style={s.label}>PART</Text>
-        {partRow(st)}
-        <Text style={s.hint}>Link a part to track stock and reorder info.</Text>
+        <Text style={s.label}>FILTER</Text>
+        {filterRow(st)}
+        <Text style={s.hint}>Link a filter to track stock and reorder info.</Text>
 
         <Pressable style={s.addStage} onPress={onAddStage}>
           <Text style={s.addStageTxt}>+ Add stage</Text>
@@ -215,8 +215,8 @@ export default function StagesEditor({
           <Text style={s.miniLabel}>INTERVAL</Text>
           {intervalRow(st)}
 
-          <Text style={s.miniLabel}>PART</Text>
-          {partRow(st)}
+          <Text style={s.miniLabel}>FILTER</Text>
+          {filterRow(st)}
         </View>
       ))}
 

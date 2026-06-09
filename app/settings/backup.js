@@ -3,7 +3,7 @@
 // Backup & Restore screen.
 //
 // Export flow:
-//   tap [Backup] → exportBackup() writes .filter file →
+//   tap [Backup] → exportBackup() writes .device file →
 //   shareBackup() opens iOS share sheet → user picks Files / AirDrop / etc.
 //
 // Restore flow:
@@ -153,8 +153,8 @@ export default function BackupSettings() {
         <Text style={s.label}>BACKUP</Text>
         <View style={s.card}>
           <Text style={s.cardBody}>
-            Creates a single file with your categories, assets, filters,
-            parts, reminders, and reference photos. Save it to Files,
+            Creates a single file with your categories, assets, devices,
+            filters, reminders, and reference photos. Save it to Files,
             AirDrop it, or send it to yourself for safekeeping.
           </Text>
           <Pressable
@@ -212,8 +212,8 @@ export default function BackupSettings() {
               <View style={s.statsList}>
                 <StatRow label="Categories" value={preview?.stats?.categoryCount ?? 0} s={s} />
                 <StatRow label="Assets"     value={preview?.stats?.assetCount ?? 0} s={s} />
-                <StatRow label="Filters"    value={preview?.stats?.filterCount ?? 0} s={s} />
-                <StatRow label="Parts"      value={preview?.stats?.partCount ?? 0} s={s} />
+                <StatRow label="Devices"    value={preview?.stats?.deviceCount ?? 0} s={s} />
+                <StatRow label="Filters"      value={preview?.stats?.filterCount ?? 0} s={s} />
                 <StatRow label="Photos"     value={preview?.stats?.photoCount ?? 0} s={s} />
               </View>
 

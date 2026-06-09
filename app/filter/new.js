@@ -1,116 +1,126 @@
 // app/filter/new.js — New Filter.
-// Modal page: extra top padding to clear iOS modal chrome edge.
-// Title indented to match Settings/Edit Filter alignment.
+// Modal page padding (clears iOS modal chrome edge). Title indented 16 to
+// match Settings. Field labels indented 13 to align with input text inside
+// each input box.
 //
-// Schedule is per-stage (StagesEditor): each stage has an interval (a number +
-// a Days/Months/Years unit) and an optional part. One stage looks like the
-// classic single-interval form; "+ Add stage" grows it into a multi-cartridge
-// unit (e.g. an RO system). The unit is converted to the stored day count on
-// save via lib/interval. A stage's part is chosen via the /picker route; the
-// pick comes back through lib/pendingPick and is folded into that stage on
-// focus. Asset is a filter-level inline chip selection.
+// Two ways in:
+//   - From the Filters inventory ("+ Add filter"): no stageId. Save/Cancel just
+//     pop back to the inventory.
+//   - From the Choose Filter picker on New/Edit Device ("+ Add new filter"): a
+//     stageId is set. New Filter is stacked ON TOP of the picker. On Save we
+//     create the filter, hand its id (plus the stageId) back to the opener via
+//     pendingPick, and pop BOTH this screen and the picker (dismiss(2)) so we
+//     land straight back on the form with the new filter selected for that
+//     stage. We do NOT write the link onto a saved device here — linking is
+//     deferred to the form's draft, which persists it on its own Save. Cancel
+//     pops one level, back to the picker.
 //
 // Keyboard handling: KeyboardAwareScrollView (react-native-keyboard-controller)
-// scrolls the focused input clear of the keyboard. Requires <KeyboardProvider>
-// in app/_layout.js. Native module — needs a dev rebuild to take effect.
+// scrolls the focused input clear of the keyboard. bottomOffset keeps a little
+// breathing room above the keyboard top edge. Requires <KeyboardProvider> in
+// app/_layout.js. Native module — needs a dev rebuild to take effect.
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { PillButton } from '../../components/HeaderBits';
-import StagesEditor from '../../components/StagesEditor';
-import { loadData, saveData, addFilter, FILTER_TYPES, partsList } from '../../data/store';
+import PhotoStrip from '../../components/PhotoStrip';
+import PhotoCropper from '../../components/PhotoCropper';
+import IntervalField from '../../components/IntervalField';
+import { loadData, saveData, addFilter, FILTER_TYPES, MAX_FILTER_PHOTOS } from '../../data/store';
 import { intervalToDays } from '../../lib/interval';
-import { consumePendingPick } from '../../lib/pendingPick';
-
-let _sid = 0;
-const newStageId = () => 'st_' + Date.now().toString(36) + '_' + (_sid++);
-// New stages default to "90 Days" (the historical default), unit Days.
-const freshStage = () => ({ id: newStageId(), value: '90', unit: 'days', partId: null });
+import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/filterPhotos';
+import { setPendingPick } from '../../lib/pendingPick';
 
 export default function NewFilter() {
   const t = useTheme();
   const router = useRouter();
+  const { stageId, multi } = useLocalSearchParams();
   const [data, setData] = useState(null);
-  const [draft, setDraft] = useState(null);
+  const [name, setName] = useState('');
+  const [type, setType] = useState('water');
+  const [intervalValue, setIntervalValue] = useState('90');
+  const [intervalUnit, setIntervalUnit] = useState('days');
+  const [sku, setSku] = useState('');
+  const [reorderUrl, setReorderUrl] = useState('');
+  const [onHand, setOnHand] = useState('0');
+  const [lowStockThreshold, setLowStockThreshold] = useState('1');
+  const [photos, setPhotos] = useState([]);
+  const [cropAsset, setCropAsset] = useState(null);
 
-  // Initialize the draft on first focus; on later focus (returning from the
-  // part picker / + Add new part) consume any pending pick into the draft.
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    loadData().then(d => {
-      if (!active) return;
-      setData(d);
-      if (!draft) {
-        const live = d.assets.find(a => !a.archived);
-        setDraft({
-          name: '',
-          type: 'air',
-          assetId: live ? live.id : null,
-          notes: '',
-          stages: [freshStage()],
-        });
-      } else {
-        const pick = consumePendingPick();
-        if (pick) {
-          setDraft(prev => {
-            if (pick.field === 'asset') return { ...prev, assetId: pick.value };
-            if (pick.field === 'part') return {
-              ...prev,
-              stages: prev.stages.map(st => st.id === pick.stageId ? { ...st, partId: pick.value } : st),
-            };
-            return prev;
-          });
-        }
-      }
-    });
-    return () => { active = false; };
-  }, [draft]));
-
+  useEffect(() => { loadData().then(setData); }, []);
   const s = makeStyles(t);
-  if (!data || !draft) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
-  const liveAssets = data.assets.filter(a => !a.archived);
-  const parts = partsList(data);
+  // How we got here: the Device editor's multi-select Filters picker (multi),
+  // a single stage's filter picker (stageId), or the Filters inventory (neither).
+  const fromMultiPicker = multi === '1' || multi === 'true';
+  const fromStagePicker = !!stageId;
+  const fromPicker = fromMultiPicker || fromStagePicker;
 
-  const setStageValue = (id, v) =>
-    setDraft(prev => ({ ...prev, stages: prev.stages.map(st => st.id === id ? { ...st, value: v } : st) }));
-  const setStageUnit = (id, u) =>
-    setDraft(prev => ({ ...prev, stages: prev.stages.map(st => st.id === id ? { ...st, unit: u } : st) }));
-  const addStage = () =>
-    setDraft(prev => ({ ...prev, stages: [...prev.stages, freshStage()] }));
-  const removeStage = (id) =>
-    setDraft(prev => ({ ...prev, stages: prev.stages.length > 1 ? prev.stages.filter(st => st.id !== id) : prev.stages }));
-  const pickPart = (stageId) => {
-    const st = draft.stages.find(x => x.id === stageId);
-    router.push({ pathname: '/picker', params: { kind: 'part', selectedId: st?.partId || '', stageId } });
+  const onCancel = async () => {
+    for (const u of photos) await deleteFile(u);
+    router.back();
   };
 
-  const onSave = async () => {
-    const stages = draft.stages.map(st => ({
-      id: st.id,
-      intervalDays: intervalToDays(st.value, st.unit),
-      partId: st.partId || null,
-    }));
+  const save = async () => {
     const next = addFilter(data, {
-      assetId: draft.assetId || liveAssets[0]?.id,
-      name: (draft.name.trim() || FILTER_TYPES[draft.type].label + ' Filter'),
-      type: draft.type,
-      notes: '',
-      stages,
+      name: name.trim() || 'Untitled filter',
+      type,
+      intervalDays: intervalToDays(intervalValue, intervalUnit),
+      sku: sku.trim(),
+      reorderUrl: reorderUrl.trim(),
+      photos,
+      onHand: Math.max(0, parseInt(onHand, 10) || 0),
+      lowStockThreshold: Math.max(0, parseInt(lowStockThreshold, 10) || 0),
     });
+    const newFilter = next.filters[next.filters.length - 1];
     await saveData(next);
-    router.back();
+
+    if (fromMultiPicker) {
+      // Stack: Device editor → multi Filters picker → here. Pop back to the
+      // picker (one level) and hand it the new id; the picker folds it into
+      // its live selection so it lands pre-checked, then Done returns the set.
+      setPendingPick({ field: 'addFilter', value: newFilter.id });
+      router.back();
+    } else if (fromStagePicker) {
+      // Stack: form → single stage picker → here. Hand the new filter (and which
+      // stage it's for) back to the form, then pop this screen AND the picker
+      // so we land straight on the form with the filter selected for that stage.
+      setPendingPick({ field: 'filter', value: newFilter.id, stageId });
+      router.dismiss(2);
+    } else {
+      router.back();
+    }
+  };
+
+  const onPickPhoto = async (source) => {
+    if (photos.length >= MAX_FILTER_PHOTOS) {
+      Alert.alert('Limit reached', `Up to ${MAX_FILTER_PHOTOS} photos.`);
+      return;
+    }
+    const asset = source === 'camera' ? await takePhoto() : await pickFromLibrary();
+    if (!asset) return;
+    setCropAsset(asset);
+  };
+  const onSaveToPhotos = async (uri) => {
+    const ok = await saveToPhotos(uri);
+    if (ok) Alert.alert('Saved', 'Photo saved to your library.');
+  };
+  const onDeletePhoto = async (index) => {
+    const uri = photos[index];
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    await deleteFile(uri);
   };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <Pressable onPress={() => router.back()} hitSlop={10}><Text style={s.cancel}>Cancel</Text></Pressable>
-        <PillButton label="Save" onPress={onSave} />
+        <Pressable onPress={onCancel} hitSlop={10}><Text style={s.cancel}>Cancel</Text></Pressable>
+        <PillButton label="Save" onPress={save} />
       </View>
 
       <KeyboardAwareScrollView
@@ -119,51 +129,73 @@ export default function NewFilter() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={s.title}>New Filter</Text>
-        <Text style={s.sub}>Set up a replacement schedule and link an optional part.</Text>
+        <Text style={s.sub}>Track stock and reorder info for this filter.</Text>
 
         <Text style={s.label}>TYPE</Text>
         <View style={s.typeRow}>
           {Object.entries(FILTER_TYPES).map(([k, v]) => {
-            const on = draft.type === k;
+            const on = type === k;
             return (
-              <Pressable key={k} onPress={() => setDraft({ ...draft, type: k })} style={[s.typeChip, on && s.typeChipOn]}>
-                <Text style={[s.typeLabel, on && s.typeLabelOn]}>{v.label}</Text>
+              <Pressable key={k} onPress={() => setType(k)} style={[s.typeChip, on && s.typeChipOn]}>
+                <Text style={[s.typeChipTxt, on && s.typeChipTxtOn]}>{v.label}</Text>
               </Pressable>
             );
           })}
         </View>
 
         <Text style={s.label}>NAME</Text>
-        <TextInput
-          style={s.input}
-          placeholder={FILTER_TYPES[draft.type].label + ' Filter'}
-          placeholderTextColor={t.muted}
-          value={draft.name}
-          onChangeText={(v) => setDraft({ ...draft, name: v })}
+        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="e.g. 20x25x1 MERV 11" placeholderTextColor={t.muted} />
+
+        <Text style={s.label}>REPLACE EVERY</Text>
+        <IntervalField
+          value={intervalValue}
+          unit={intervalUnit}
+          onChangeValue={setIntervalValue}
+          onChangeUnit={setIntervalUnit}
         />
 
-        <Text style={s.label}>ASSET</Text>
-        <View style={s.chipWrap}>
-          {liveAssets.map(a => {
-            const on = draft.assetId === a.id;
-            return (
-              <Pressable key={a.id} onPress={() => setDraft({ ...draft, assetId: a.id })} style={[s.chip, on && s.chipOn]}>
-                <Text style={[s.chipTxt, on && s.chipTxtOn]}>{a.name}</Text>
-              </Pressable>
-            );
-          })}
+        <Text style={s.label}>SKU</Text>
+        <TextInput style={s.input} value={sku} onChangeText={setSku} placeholder="e.g. EDR1RXD1" placeholderTextColor={t.muted} autoCapitalize="characters" />
+
+        <Text style={s.label}>REORDER URL</Text>
+        <TextInput style={s.input} value={reorderUrl} onChangeText={setReorderUrl} placeholder="https://..." placeholderTextColor={t.muted} autoCapitalize="none" autoCorrect={false} />
+
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.label}>ON HAND</Text>
+            <TextInput style={s.input} value={onHand} onChangeText={(v) => setOnHand(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.label}>LOW-STOCK AT</Text>
+            <TextInput style={s.input} value={lowStockThreshold} onChangeText={(v) => setLowStockThreshold(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" />
+          </View>
         </View>
+        <Text style={s.hint}>You'll get a low-stock alert when on-hand reaches this number.</Text>
 
-        <StagesEditor
-          stages={draft.stages}
-          parts={parts}
-          onSetValue={setStageValue}
-          onSetUnit={setStageUnit}
-          onAddStage={addStage}
-          onRemoveStage={removeStage}
-          onPickPart={pickPart}
-        />
+        <Text style={s.label}>PHOTOS</Text>
+        <View style={{ paddingLeft: 13 }}>
+          <PhotoStrip
+            photos={photos}
+            max={MAX_FILTER_PHOTOS}
+            onPick={onPickPhoto}
+            onSaveToPhotos={onSaveToPhotos}
+            onDelete={onDeletePhoto}
+          />
+        </View>
+        <Text style={s.hint}>Up to {MAX_FILTER_PHOTOS} reference photos.</Text>
+
+        {fromPicker && <Text style={[s.hint, { marginTop: 16 }]}>This filter will be added to the device you came from.</Text>}
       </KeyboardAwareScrollView>
+
+      <PhotoCropper
+        visible={!!cropAsset}
+        asset={cropAsset}
+        onCancel={() => setCropAsset(null)}
+        onDone={(uri) => {
+          if (uri) setPhotos(prev => [...prev, uri].slice(0, MAX_FILTER_PHOTOS));
+          setCropAsset(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -176,16 +208,12 @@ function makeStyles(t) {
     title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
     sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
-    input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
-    typeRow: { flexDirection: 'row', gap: 8 },
-    typeChip: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: t.radius.chip, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
+    typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    typeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
     typeChipOn: { backgroundColor: t.tabIdleBg },
-    typeLabel: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
-    typeLabelOn: { color: t.ink, fontWeight: '700' },
-    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
-    chipOn: { backgroundColor: t.tabIdleBg },
-    chipTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
-    chipTxtOn: { color: t.ink, fontWeight: '700' },
+    typeChipTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    typeChipTxtOn: { color: t.ink },
+    input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
+    hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 13 },
   });
 }

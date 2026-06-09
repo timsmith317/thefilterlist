@@ -1,33 +1,33 @@
-// app/picker.js — Asset / Part selection, presented as a stacked modal route.
+// app/picker.js — Asset / Filter selection, presented as a stacked modal route.
 //
-// Why a route instead of an overlay <Modal>: when "+ Add new part" pushes the
-// New Part screen, we want New Part to slide up ON TOP of this picker and
-// cover it, with the picker staying put underneath. As a modal ROUTE, New Part
+// Why a route instead of an overlay <Modal>: when "+ Add new filter" pushes the
+// New Filter screen, we want New Filter to slide up ON TOP of this picker and
+// cover it, with the picker staying put underneath. As a modal ROUTE, New Filter
 // stacks natively on top; opening this picker is the native sheet slide.
 //
 // Two selection modes:
 //   SINGLE (default) — tap a row to choose one value; resolves immediately to
 //     the opener via lib/pendingPick { field:kind, value, stageId } and pops.
-//     Used for assets and for a single stage's part (the StagesEditor flow).
-//   MULTI (param multi='1', parts only) — tap rows to toggle a checkbox set,
+//     Used for assets and for a single stage's filter (the StagesEditor flow).
+//   MULTI (param multi='1', filters only) — tap rows to toggle a checkbox set,
 //     seeded from `selectedIds`. Done returns the whole set as
-//     { field:'parts', values:[...] }; Cancel pops with nothing pending.
-//     Used by the Filter editor to pick the set of parts a filter contains.
+//     { field:'filters', values:[...] }; Cancel pops with nothing pending.
+//     Used by the Device editor to pick the set of filters a device contains.
 //
-// "+ Add new part" pushes New Part on top:
-//   - single: New Part pops BOTH itself and this picker (dismiss 2), handing
-//     the new part straight to the opener.
-//   - multi: New Part pops back to THIS picker (pop 1) and hands the new id
-//     back via { field:'addPart', value }, which we fold into the live
+// "+ Add new filter" pushes New Filter on top:
+//   - single: New Filter pops BOTH itself and this picker (dismiss 2), handing
+//     the new filter straight to the opener.
+//   - multi: New Filter pops back to THIS picker (pop 1) and hands the new id
+//     back via { field:'addFilter', value }, which we fold into the live
 //     selection here so it lands pre-checked; Done then returns the set.
 //
 // Params (all strings, via the URL):
-//   kind       - 'part' | 'asset'
-//   multi      - '1' to enable multi-select (parts only)
+//   kind       - 'filter' | 'asset'
+//   multi      - '1' to enable multi-select (filters only)
 //   selectedId - SINGLE: the currently selected id ('' = none)
 //   selectedIds- MULTI: comma-separated currently selected ids
-//   stageId    - (single part picks) the draft stage this pick is FOR
-//   filterId   - (asset picks) the filter a newly created asset links to
+//   stageId    - (single filter picks) the draft stage this pick is FOR
+//   deviceId   - (asset picks) the device a newly created asset links to
 
 import React, { useState, useMemo, useCallback } from 'react';
 import {
@@ -37,15 +37,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../theme/theme';
-import { loadData, partsList } from '../data/store';
+import { loadData, filtersList } from '../data/store';
 import { setPendingPick, consumePendingPick } from '../lib/pendingPick';
 
 export default function Picker() {
   const t = useTheme();
   const router = useRouter();
-  const { kind, multi, selectedId, selectedIds, filterId, stageId } = useLocalSearchParams();
-  const isPart = kind === 'part';
-  const isMulti = isPart && (multi === '1' || multi === 'true');
+  const { kind, multi, selectedId, selectedIds, deviceId, stageId } = useLocalSearchParams();
+  const isFilter = kind === 'filter';
+  const isMulti = isFilter && (multi === '1' || multi === 'true');
 
   const [data, setData] = useState(null);
   const [query, setQuery] = useState('');
@@ -58,14 +58,14 @@ export default function Picker() {
   const [contentH, setContentH] = useState(0);
   const s = makeStyles(t);
 
-  // Reload on focus so a just-created part shows up; in multi mode also fold a
-  // newly-created part into the live selection.
+  // Reload on focus so a just-created filter shows up; in multi mode also fold a
+  // newly-created filter into the live selection.
   useFocusEffect(useCallback(() => {
     let active = true;
     loadData().then(d => { if (active) setData(d); });
     if (isMulti) {
       const pick = consumePendingPick();
-      if (pick && pick.field === 'addPart' && pick.value) {
+      if (pick && pick.field === 'addFilter' && pick.value) {
         setSelected(prev => new Set(prev).add(pick.value));
       }
     }
@@ -74,15 +74,15 @@ export default function Picker() {
 
   const items = useMemo(() => {
     if (!data) return [];
-    return isPart ? partsList(data) : data.assets.filter(a => !a.archived);
-  }, [data, isPart]);
+    return isFilter ? filtersList(data) : data.assets.filter(a => !a.archived);
+  }, [data, isFilter]);
 
-  const searchKeys = isPart ? ['name', 'sku'] : ['name'];
-  const title = isMulti ? 'Choose Parts' : (isPart ? 'Choose Part' : 'Choose Asset');
-  const searchPlaceholder = isPart ? 'Search by name or SKU...' : 'Search assets...';
-  const emptyText = isPart ? 'No parts yet.' : 'No assets yet.';
+  const searchKeys = isFilter ? ['name', 'sku'] : ['name'];
+  const title = isMulti ? 'Choose Filters' : (isFilter ? 'Choose Filter' : 'Choose Asset');
+  const searchPlaceholder = isFilter ? 'Search by name or SKU...' : 'Search assets...';
+  const emptyText = isFilter ? 'No filters yet.' : 'No assets yet.';
 
-  const filtered = useMemo(() => {
+  const deviceed = useMemo(() => {
     if (!query.trim()) return items;
     const q = query.toLowerCase();
     return items.filter(item =>
@@ -94,13 +94,13 @@ export default function Picker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, query]);
 
-  const noMatches = query && filtered.length === 0;
-  const showNoneRow = isPart && !isMulti && !query;
+  const noMatches = query && deviceed.length === 0;
+  const showNoneRow = isFilter && !isMulti && !query;
   const overflow = viewportH > 0 && contentH > viewportH;
 
-  const showAdd = isPart ? true : !!filterId;
-  const addLabel = isPart ? '+ Add new part' : '+ Add asset';
-  const addPath = isPart ? '/part/new' : '/asset/new';
+  const showAdd = isFilter ? true : !!deviceId;
+  const addLabel = isFilter ? '+ Add new filter' : '+ Add asset';
+  const addPath = isFilter ? '/filter/new' : '/asset/new';
 
   // SINGLE: resolve one value to the opener and pop.
   const choose = (value) => {
@@ -115,14 +115,14 @@ export default function Picker() {
       return n;
     });
   const done = () => {
-    setPendingPick({ field: 'parts', values: [...selected] });
+    setPendingPick({ field: 'filters', values: [...selected] });
     router.back();
   };
 
-  // Push New Part/Asset ON TOP. In multi we pass multi so New Part returns to
-  // THIS picker; otherwise it carries stageId/filterId for the single flow.
+  // Push New Filter/Asset ON TOP. In multi we pass multi so New Filter returns to
+  // THIS picker; otherwise it carries stageId/deviceId for the single flow.
   const addNew = () => {
-    router.push({ pathname: addPath, params: isMulti ? { multi: '1' } : { filterId, stageId } });
+    router.push({ pathname: addPath, params: isMulti ? { multi: '1' } : { deviceId, stageId } });
   };
 
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
@@ -176,18 +176,18 @@ export default function Picker() {
         >
           {showNoneRow && (
             <Pressable style={s.row} onPress={() => choose(null)}>
-              <Text style={[s.rowName, !selectedId && s.rowNameOn]}>None (no part linked)</Text>
+              <Text style={[s.rowName, !selectedId && s.rowNameOn]}>None (no filter linked)</Text>
               {!selectedId && <Text style={s.check}>✓</Text>}
             </Pressable>
           )}
 
-          {filtered.length === 0 && (
+          {deviceed.length === 0 && (
             <View style={s.empty}>
               <Text style={s.emptyTxt}>{noMatches ? 'No matches' : emptyText}</Text>
             </View>
           )}
 
-          {filtered.map(item => {
+          {deviceed.map(item => {
             const on = isMulti ? selected.has(item.id) : (item.id === selectedId);
             return (
               <Pressable

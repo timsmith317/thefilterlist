@@ -28,10 +28,10 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
-import { LogoMark, TypeIcon, IconGear } from '../theme/Icons';
+import { LogoMark, DeviceIcon, IconGear } from '../theme/Icons';
 import Wordmark from '../theme/Wordmark';
 import {
-  loadData, dueSoonList, filtersForCategory, dueCount,
+  loadData, dueSoonList, devicesForAssetId, assetsList, dueCount,
 } from '../data/store';
 import { formatInterval } from '../lib/interval';
 
@@ -51,8 +51,8 @@ export default function DueSoon() {
 
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
-  const tabs = [{ id: 'All', name: 'All' }, ...data.categories.slice().sort((a, b) => a.order - b.order)];
-  const list = tab === 'All' ? dueSoonList(data) : filtersForCategory(data, tab);
+  const tabs = [{ id: 'All', name: 'All' }, ...assetsList(data).map(a => ({ id: a.id, name: a.name }))];
+  const list = tab === 'All' ? dueSoonList(data) : devicesForAssetId(data, tab);
   const due = dueCount(list);
   const s = makeStyles(t);
 
@@ -73,7 +73,7 @@ export default function DueSoon() {
         </View>
       </View>
       <Text style={s.sub}>
-        {due === 0 ? "Everything's fresh." : `${due} filter${due > 1 ? 's' : ''} need${due > 1 ? '' : 's'} attention`}
+        {due === 0 ? "Everything's fresh." : `${due} device${due > 1 ? 's' : ''} need${due > 1 ? '' : 's'} attention`}
       </Text>
 
       {/* Tabs use space-between with flexGrow: 1 so the "All" pill sits at
@@ -93,16 +93,16 @@ export default function DueSoon() {
       </ScrollView>
 
       <ScrollView style={s.list} contentContainerStyle={s.listContent}>
-        {list.length === 0 && <Text style={s.empty}>No filters here yet.</Text>}
+        {list.length === 0 && <Text style={s.empty}>No devices here yet.</Text>}
         {list.map(f => {
           const tone = t.status[f.status.key];
           const multi = f.status.stageCount > 1;
-          const noParts = f.status.stageCount === 0;
+          const noFilters = f.status.stageCount === 0;
           return (
-            <Pressable key={f.id} style={s.card} onPress={() => router.push(`/filter/${f.id}`)}>
+            <Pressable key={f.id} style={s.card} onPress={() => router.push(`/device/${f.id}`)}>
               {/* Icon chip top-aligned with the title (alignItems: flex-start on
                   the card), so single- and multi-line cards both look aligned. */}
-              <View style={s.iconChip}><TypeIcon type={f.type} size={32} color={t.iconInk} /></View>
+              <View style={s.iconChip}><DeviceIcon iconName={f.icon} displayType={f.displayType} size={32} color={t.iconInk} /></View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 {/* Title + status pill share the top line. The title stays a
                     single line and truncates (we'd rather clip than wrap and
@@ -110,11 +110,7 @@ export default function DueSoon() {
                     PILL_NUDGE. */}
                 <View style={s.topRow}>
                   <Text style={s.cardName} numberOfLines={1}>{f.name}</Text>
-                  {noParts ? (
-                    <View style={[s.pill, { backgroundColor: t.tabIdleBg, marginTop: PILL_NUDGE }]}>
-                      <Text style={[s.pillTxt, { color: t.inkSoft }]}>No parts</Text>
-                    </View>
-                  ) : (
+                  {!noFilters && (
                     <View style={[s.pill, { backgroundColor: tone.pillBg, marginTop: PILL_NUDGE }]}>
                       <Text style={[s.pillTxt, { color: tone.pillInk }]}>{f.status.label}</Text>
                     </View>
@@ -126,7 +122,7 @@ export default function DueSoon() {
                     height. The meta text truncates behind the badge if long. */}
                 <View style={s.metaRow}>
                   <Text style={s.cardMeta} numberOfLines={1}>
-                    {f.asset?.name}{noParts ? '' : multi ? ' · varies' : ` · every ${formatInterval(f.intervalDays)}`}
+                    {f.asset?.name}{noFilters ? '' : multi ? ' · varies' : ` · every ${formatInterval(f.intervalDays)}`}
                   </Text>
                   {multi && (
                     <View style={s.stagesBadge}>
@@ -173,7 +169,7 @@ function makeStyles(t) {
     // spreads the few pills across the row. gap is the minimum spacing
     // for the overflow case (many categories scrolling).
     // paddingTop (20) is larger than paddingBottom (t.space.sm = 8) to
-    // give the tabs row breathing room from the "N filters need
+    // give the tabs row breathing room from the "N devices need
     // attention" sub text above.
     tabs: {
       flexGrow: 1,

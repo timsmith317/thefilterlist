@@ -1,6 +1,6 @@
-// theme/Icons.js — brand logo + filter type icons.
+// theme/Icons.js — brand logo + device type icons.
 //
-// LogoMark: three stacked filter frames (the brand mark).
+// LogoMark: three stacked device frames (the brand mark).
 // IconWater: SF Symbol "humidity" with stroke boost to match fan weight.
 // IconAir:   SF Symbol "fan".
 // IconOther: rounded square with divider (fallback type).
@@ -8,10 +8,11 @@
 
 import React, { useId } from 'react';
 import Svg, { Path, Circle, Rect, G, Defs, Mask } from 'react-native-svg';
+import { SymbolView } from 'expo-symbols';
 import { useTheme } from './theme';
 
 // ----- LogoMark -----
-// Three stacked filter-frame shapes. The two rear frames are brand-green
+// Three stacked device-frame shapes. The two rear frames are brand-green
 // (now via t.brand, theme-aware: #15803d in light, #4ade80 in dark). The
 // front frame uses the passed color (defaults to t.ink) so it stays
 // readable on either background.
@@ -125,4 +126,31 @@ export function TypeIcon({ type, size = 32, color, bg }) {
   if (type === 'water') return <IconWater size={size} color={color} />;
   if (type === 'air')   return <IconAir size={size} color={color} />;
   return <IconOther size={size} color={color} />;
+}
+
+// ----- DeviceIcon -----
+// The icon shown for a DEVICE. If the device has an explicit `iconName` (an SF
+// Symbol chosen by the user), render it through expo-symbols in monochrome mode
+// tinted to `color` — because `color` is a theme token (t.iconInk), the symbol
+// flips for light/dark exactly like the built-in glyphs, with no per-symbol
+// handling. With no `iconName`, fall back to the derived water/air/other glyph
+// via `displayType`. NOTE: expo-symbols is a native module — it renders only in
+// a dev/standalone build, never Expo Go. An unknown symbol name renders the
+// IconOther fallback.
+export function DeviceIcon({ iconName, displayType, size = 32, color }) {
+  const t = useTheme();
+  const ink = color || t.iconInk || t.ink;
+  if (iconName) {
+    return (
+      <SymbolView
+        name={iconName}
+        type="monochrome"
+        tintColor={ink}
+        size={size}
+        resizeMode="scaleAspectFit"
+        fallback={<IconOther size={size} color={ink} />}
+      />
+    );
+  }
+  return <TypeIcon type={displayType} size={size} color={ink} />;
 }

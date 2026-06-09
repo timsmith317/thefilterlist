@@ -62,6 +62,7 @@ export default {
       'expo-image-picker',
       'expo-file-system',
       'expo-sharing',
+      'expo-font',
     ],
     experiments: {
       typedRoutes: true,

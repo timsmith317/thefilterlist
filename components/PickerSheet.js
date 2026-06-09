@@ -1,7 +1,7 @@
 // components/PickerSheet.js
 //
 // Modal sheet picker for choosing one item from a (possibly large) list.
-// Used for both Asset and Part selection on Edit Filter.
+// Used for both Asset and Filter selection on Edit Device.
 //
 // Animation: this is a self-animated sheet (transparent Modal +
 // animationType="none" + a manual translateY slide), NOT the native iOS
@@ -96,7 +96,7 @@ export default function PickerSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const filtered = useMemo(() => {
+  const deviceed = useMemo(() => {
     if (!query.trim()) return items;
     const q = query.toLowerCase();
     return items.filter(item =>
@@ -107,7 +107,7 @@ export default function PickerSheet({
     );
   }, [items, query, searchKeys]);
 
-  const noMatches = query && filtered.length === 0;
+  const noMatches = query && deviceed.length === 0;
   const showNoneRow = !!onSelectNone && !query;
   const overflow = viewportH > 0 && contentH > viewportH;
 
@@ -169,13 +169,13 @@ export default function PickerSheet({
               </Pressable>
             )}
 
-            {filtered.length === 0 && (
+            {deviceed.length === 0 && (
               <View style={s.empty}>
                 <Text style={s.emptyTxt}>{noMatches ? 'No matches' : emptyText}</Text>
               </View>
             )}
 
-            {filtered.map(item => {
+            {deviceed.map(item => {
               const on = item.id === selectedId;
               return (
                 <Pressable key={item.id} style={s.row} onPress={() => onSelect(item.id)}>

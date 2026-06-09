@@ -1,7 +1,7 @@
 // components/IntervalField.js — a standalone interval input: a number field
 // that fills the row + a looped Days/Months/Years unit roller right-justified
-// to the content edge. This is the same control used inside the Filter editor's
-// StagesEditor, lifted out so the Part screens can edit a part's recommended
+// to the content edge. This is the same control used inside the Device editor's
+// StagesEditor, lifted out so the Filter screens can edit a filter's recommended
 // interval with the exact same feel.
 //
 // Controlled: the parent owns { value (string of digits), unit (key) } and gets

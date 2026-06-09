@@ -1,15 +1,8 @@
-// app/settings/filters.js — Filters inventory.
+// app/settings/filters.js — Filters (replaceable items inventory).
 //
-// The place to see and manage your live filters across every asset. Tap a
-// row to open the filter detail (edit / mark replaced / notes); the bottom
-// button adds a new one (filter/new.js has its own asset picker, so no asset
-// needs to be pre-selected here).
-//
-// Filters whose asset is archived are hidden here (same as the home and
-// category views). Unarchiving the asset brings its filters back — nothing
-// is deleted, this is just a computed view.
-//
-// Add button uses the same hug-then-pin behavior as the other list screens.
+// Same alignment principle as Settings: chevron at x=18 (card edge),
+// title indented to line up with card interior text.
+// (Card padding is 14 here, vs 16 in Settings, hence the different indent.)
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
@@ -17,7 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
-import { loadData, statusOf } from '../../data/store';
+import { loadData, filtersList, isFilterLow, devicesUsingFilter } from '../../data/store';
 
 export default function FiltersInventory() {
   const t = useTheme();
@@ -25,7 +18,7 @@ export default function FiltersInventory() {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
 
-  // Hug-then-pin Add button (matches the other settings screens).
+  // Hug-then-pin Add button (see assets.js for the rationale).
   const [viewportH, setViewportH] = useState(0);
   const [contentH, setContentH] = useState(0);
   const [footerH, setFooterH] = useState(0);
@@ -39,22 +32,9 @@ export default function FiltersInventory() {
   const s = makeStyles(t);
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
-  const assetsById = Object.fromEntries((data.assets || []).map(a => [a.id, a]));
-  // Live filters only — those whose asset exists and isn't archived —
-  // sorted alphabetically by name. Archived-asset filters are hidden here
-  // (they return when the asset is unarchived).
-  const filters = (data.filters || [])
-    .map(f => {
-      const asset = assetsById[f.assetId];
-      return { ...f, asset, archived: !asset || !!asset.archived, status: statusOf(f) };
-    })
-    .filter(f => !f.archived)
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
+  const filters = filtersList(data);
+  const lowCount = filters.filter(isFilterLow).length;
   const overflow = viewportH > 0 && contentH > viewportH;
-
-  const statusColors = (key) =>
-    (t.status && t.status[key]) || { pillBg: t.tabIdleBg, pillInk: t.ink };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -64,39 +44,32 @@ export default function FiltersInventory() {
       </View>
 
       <ScrollView
-        style={s.scrollView}
+        style={{ flex: 1 }}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setContentH(h)}
-        contentContainerStyle={[s.scroll, { paddingBottom: (overflow ? footerH : 0) + 16 }]}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: (overflow ? footerH : 0) + 16 }}
       >
         <Text style={s.title}>Filters</Text>
         <Text style={s.sub}>
           {filters.length === 0
-            ? 'No filters yet. Add one to start tracking replacements.'
-            : `${filters.length} filter${filters.length === 1 ? '' : 's'} across your assets.`}
+            ? 'No filters yet. Add one to track reorders and on-hand stock.'
+            : `${filters.length} filter${filters.length > 1 ? 's' : ''}` + (lowCount ? ` · ${lowCount} low stock` : '')}
         </Text>
 
         <View style={{ marginTop: 16 }}>
-          {filters.map(f => {
-            const c = statusColors(f.status.key);
+          {filters.map(p => {
+            const low = isFilterLow(p);
+            const using = devicesUsingFilter(data, p.id).length;
             return (
-              <Pressable
-                key={f.id}
-                onPress={() => router.push(`/filter/${f.id}`)}
-                style={({ pressed }) => [s.card, pressed && s.cardPressed]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.cardName} numberOfLines={1}>{f.name || 'Untitled filter'}</Text>
-                  <Text style={s.cardMeta} numberOfLines={1}>
-                    {f.asset.name} · every {f.intervalDays}d
+              <Pressable key={p.id} style={s.row} onPress={() => router.push(`/filter/${p.id}`)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowName} numberOfLines={1}>{p.name || 'Untitled filter'}</Text>
+                  <Text style={s.rowMeta}>
+                    {p.sku ? `SKU ${p.sku} · ` : ''}On hand: {p.onHand} · used by {using}
                   </Text>
                 </View>
-                <View style={[s.statusPill, { backgroundColor: c.pillBg }]}>
-                  <Text style={[s.statusPillTxt, { color: c.pillInk }]} numberOfLines={1}>
-                    {f.status.label}
-                  </Text>
-                </View>
-                <Text style={s.chev}>{'\u203A'}</Text>
+                {low && <View style={s.lowPill}><Text style={s.lowPillTxt}>Low</Text></View>}
+                <Text style={s.chev}>›</Text>
               </Pressable>
             );
           })}
@@ -126,33 +99,19 @@ export default function FiltersInventory() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
-    },
-    scroll: { paddingHorizontal: 18, paddingBottom: 40 },
-    scrollView: { flex: 1 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
+    // Title indented by card's interior padding (14) to align with card text.
+    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 14 },
+    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 14 },
+    row: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 12, padding: 14, marginBottom: 10, gap: 10 },
+    rowName: { fontSize: 15, fontWeight: '600', color: t.ink },
+    rowMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
+    lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
+    chev: { fontSize: 22, color: t.muted },
 
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, lineHeight: 18 },
-
-    card: {
-      flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 14,
-      borderRadius: 12, borderWidth: 1.5, borderColor: t.line,
-      backgroundColor: t.card,
-      marginBottom: 10,
-    },
-    cardPressed: { backgroundColor: t.tabIdleBg },
-    cardName: { fontSize: 16, fontWeight: '700', color: t.ink },
-    cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
-
-    statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginLeft: 8 },
-    statusPillTxt: { fontSize: 11, fontWeight: '700' },
-
-    chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
-
-    // Matches the Add buttons on the other settings screens.
+    // Matches the "Mark Replaced" / Add buttons on Categories & Assets:
+    // grey fill, no border, bold black.
     addBtn: {
       padding: 14,
       borderRadius: t.radius.btn,

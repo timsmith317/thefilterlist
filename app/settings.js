@@ -1,42 +1,37 @@
 // app/settings.js — Settings hub.
 //
-// Layout pattern matches the subscreens (Reminders, Categories, Parts):
+// Layout pattern matches the subscreens (Reminders, Filters, Assets):
 //   - <BackButton> at top-left
 //   - Big title below (canonical 26/800/0.5 via t.type.screenTitle)
 //   - Subtitle (13pt, muted)
-//   - Stack of bordered cards, each linking to a subscreen
+//   - Stack of bordered cards, each linking to a subscreen (including About)
 //
 // Cards link via `route`. If a row is ever added without a route, it
-// renders without a chevron and shows a "coming soon" alert on tap —
-// defensive code path; all current rows have routes.
+// renders without a chevron and shows a "coming soon" alert on tap.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
 import { BackButton } from '../components/HeaderBits';
 
-// Nudge the bottom "About" link vertically. Negative = up, positive = down.
-const ABOUT_NUDGE_Y = -8;
-
 export default function Settings() {
   const t = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const s = makeStyles(t);
 
-  // Row order is usage-based: Filters → Parts → Assets → Categories →
-  // Reminders → Backup. About lives at the bottom as a centered text link
-  // (not a chevron row). Built rows have a route; unbuilt rows have
-  // route:null and render without a chevron.
+  // Row order is usage-based: Devices → Filters → Assets → Reminders → Backup →
+  // Help → About. Every row is a bordered chevron card. (Categories were removed —
+  // assets are now the single organizing dimension.)
   const rows = [
-    { k: 'filters',    label: 'Filters',           desc: 'Add, edit, and schedule filters',   route: '/settings/filters' },
-    { k: 'parts',      label: 'Parts Inventory',   desc: 'Track on-hand stock and reorders',  route: '/settings/parts' },
-    { k: 'assets',     label: 'Assets & Archive',  desc: 'Manage homes, cars, archive',       route: '/settings/assets' },
-    { k: 'categories', label: 'Categories',        desc: 'Rename or add categories',          route: '/settings/categories' },
-    { k: 'reminders',  label: 'Reminders',         desc: 'Push notifications, lead time',     route: '/settings/reminders' },
-    { k: 'backup',     label: 'Backup & Restore',  desc: 'Export / import your data',         route: '/settings/backup' },
+    { k: 'devices',   label: 'Devices',          desc: 'Add, edit, and schedule devices',  route: '/settings/devices' },
+    { k: 'filters',     label: 'Filters',             desc: 'Track on-hand stock and reorders', route: '/settings/filters' },
+    { k: 'assets',    label: 'Assets & Archive', desc: 'Manage and reorder your assets',    route: '/settings/assets' },
+    { k: 'reminders', label: 'Reminders',        desc: 'Push notifications, lead time',     route: '/settings/reminders' },
+    { k: 'backup',    label: 'Backup & Restore', desc: 'Export / import your data',         route: '/settings/backup' },
+    { k: 'help',      label: 'Help & Tips',      desc: 'How the app works',                 route: '/settings/help' },
+    { k: 'about',     label: 'About',            desc: 'Version, credits, and licenses',    route: '/settings/about' },
   ];
 
   const onPress = (row) => {
@@ -53,7 +48,7 @@ export default function Settings() {
 
       <ScrollView style={s.scrollView} contentContainerStyle={s.scroll}>
         <Text style={s.title}>Settings</Text>
-        <Text style={s.sub}>Configure filters, reminders, categories, parts, and backups.</Text>
+        <Text style={s.sub}>Configure devices, reminders, filters, and backups.</Text>
 
         <View style={s.cards}>
           {rows.map((r) => (
@@ -71,14 +66,6 @@ export default function Settings() {
           ))}
         </View>
       </ScrollView>
-
-      {/* About lives here as a centered text link, pinned to the bottom so
-          it's always reachable without scrolling. */}
-      <View style={[s.aboutFooter, { paddingBottom: Math.max(insets.bottom, 12), transform: [{ translateY: ABOUT_NUDGE_Y }] }]}>
-        <Pressable hitSlop={10} onPress={() => router.push('/settings/about')}>
-          <Text style={s.aboutLink}>About</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -86,39 +73,20 @@ export default function Settings() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-
-    // Matches subscreens: BackButton sits in a slim head row at top-left.
     head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
-
     scroll: { paddingHorizontal: 18, paddingBottom: 24 },
     scrollView: { flex: 1 },
 
-    // About — centered text link pinned at the bottom of the screen.
-    aboutFooter: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 18 },
-    aboutLink: { fontSize: 16, fontWeight: '700', color: t.ink },
-
-    // Canonical screen title — 26/800/0.5 via t.type.screenTitle. Same
-    // token as Due Soon, Filter detail, and every other screen header.
-    title: {
-      ...t.type.screenTitle, color: t.ink,
-      marginTop: 4, paddingLeft: 16,
-    },
-    sub: {
-      fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16,
-      marginBottom: 22, lineHeight: 18,
-    },
+    title: { ...t.type.screenTitle, color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
 
     cards: {},
-
-    // Card metrics align with the row pattern used in reminders.js
-    // (paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, etc.)
-    // but with a touch more vertical room since each card has two lines.
     card: {
       flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 11,
+      paddingHorizontal: 16, paddingVertical: 10,
       borderRadius: 12, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.card,
       marginBottom: 8,

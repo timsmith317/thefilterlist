@@ -2,7 +2,11 @@
 // Empty slots show a dashed-bordered "+" tap target. Tapping an empty slot
 // offers Camera / Library. Tapping a filled slot offers Save to Photos /
 // Delete. Caller provides photos array and callbacks; this is pure UI.
-
+//
+// Thumbnails use resizeMode 'contain' so the WHOLE composed photo shows inside
+// the square slot (a tall device isn't re-cropped). The slot's card background
+// fills any spare space — and matches what the cropper preview shows, so the
+// thumbnail looks like what you framed.
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet, ActionSheetIOS, Alert, Platform } from 'react-native';
 import { useTheme } from '../theme/theme';
@@ -10,6 +14,7 @@ import { useTheme } from '../theme/theme';
 export default function PhotoStrip({ photos = [], max = 3, onPick, onSaveToPhotos, onDelete }) {
   const t = useTheme();
   const s = makeStyles(t);
+
   const slots = [];
   for (let i = 0; i < max; i++) slots.push(photos[i] || null);
 
@@ -80,6 +85,6 @@ function makeStyles(t) {
     slotEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.iconBorder, backgroundColor: t.card },
     slotFilled: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
     plus: { fontSize: 30, color: t.muted, fontWeight: '300' },
-    img: { width: '100%', height: '100%', resizeMode: 'cover' },
+    img: { width: '100%', height: '100%', resizeMode: 'contain' },
   });
 }

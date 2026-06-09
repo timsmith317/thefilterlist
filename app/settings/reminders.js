@@ -129,7 +129,7 @@ export default function RemindersSettings() {
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
         <Text style={s.title}>Reminders</Text>
-        <Text style={s.sub}>Get notified before filters are due.</Text>
+        <Text style={s.sub}>Get notified before devices are due.</Text>
 
         {/* Permission banner if reminders are on but iOS notifications are off */}
         {enabled && !perm.granted && (
