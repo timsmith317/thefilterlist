@@ -219,6 +219,61 @@ function migrateDeviceManual(data) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Photo path normalization (filter reference photos)
+// ---------------------------------------------------------------------------
+// Photos are COPIED into <documentDirectory>/part-photos/ by lib/filterPhotos.
+// We persist only the RELATIVE filename here, never the absolute URI: the
+// document directory's absolute path contains the app's data-container UUID,
+// which iOS does not guarantee to keep stable across reinstalls/updates. The
+// absolute URI is rebuilt at render time (lib/filterPhotos.photoUri) against the
+// CURRENT document directory, so a file stays reachable even if the container
+// moves. See lib/filterPhotos for the read-side resolver.
+
+// Reduce a stored photo value to its relative filename. A documents copy
+// (file://.../part-photos/<name>) becomes <name>; an already-relative name is
+// left alone; any other absolute URI (e.g. a copy-failure cache fallback) is
+// left as-is so it still renders this session (it just won't survive a move).
+function toRelativePhoto(value) {
+  if (!value || typeof value !== 'string') return value;
+  if (value.startsWith('file:') || value.startsWith('/')) {
+    const rest = value.split('/part-photos/')[1];
+    if (rest) return rest.split('?')[0];
+    return value;
+  }
+  return value;
+}
+
+// One-time, idempotent migration of already-stored photo references:
+//   absolute documents URI  -> relative filename (now move-proof)
+//   dead cache/library URI  -> DROPPED (the bytes were evicted long ago; keeping
+//                              it only yields a permanent blank thumbnail)
+//   already-relative name   -> kept unchanged
+// Runs on every load; once all photos are bare filenames it's a no-op.
+function migratePhotoPaths(data) {
+  if (!data || !Array.isArray(data.filters)) return data;
+  let any = false;
+  const filters = data.filters.map(p => {
+    if (!Array.isArray(p.photos) || p.photos.length === 0) return p;
+    let touched = false;
+    const next = [];
+    for (const ph of p.photos) {
+      if (typeof ph !== 'string') { touched = true; continue; }
+      if (ph.startsWith('file:') || ph.startsWith('/')) {
+        const rest = ph.split('/part-photos/')[1];
+        if (rest) { next.push(rest.split('?')[0]); touched = true; } // doc copy -> relative
+        else { touched = true; }                                     // drop dead cache ref
+      } else {
+        next.push(ph);                                               // already relative
+      }
+    }
+    if (!touched) return p;
+    any = true;
+    return { ...p, photos: next };
+  });
+  return any ? { ...data, filters } : data;
+}
+
 function seed() {
   return {
     schemaVersion: 3,
@@ -397,12 +452,12 @@ export async function loadData() {
       const parsed = JSON.parse(v2);
       // Defensive: ensure filters have photos:[] (covers users who saved before this field existed)
       if (parsed.filters) parsed.filters = parsed.filters.map(p => ({ ...p, photos: p.photos || [] }));
-      return ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(parsed))))))));
+      return ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(parsed)))))))));
     }
     const v1raw = await AsyncStorage.getItem(LEGACY_KEY_V1);
     if (v1raw) {
       const v1 = JSON.parse(v1raw);
-      const migrated = ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(migrateV1toV2(v1)))))))));
+      const migrated = ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(migrateV1toV2(v1))))))))));
       await saveData(migrated);
       return migrated;
     }
@@ -700,13 +755,16 @@ export function deleteFilter(data, filterId) {
   };
 }
 
-// Photo helpers — pure mutations on a Filter's photos array.
+// Photo helpers — pure mutations on a Filter's photos array. Stored values are
+// RELATIVE filenames (resolved to absolute at render time); normalize on the way
+// in so the data layer never holds a container-specific absolute path.
 export function addFilterPhoto(data, filterId, uri) {
+  const rel = toRelativePhoto(uri);
   return {
     ...data,
     filters: (data.filters || []).map(p => {
       if (p.id !== filterId) return p;
-      const next = [...(p.photos || []), uri].slice(0, MAX_FILTER_PHOTOS);
+      const next = [...(p.photos || []), rel].slice(0, MAX_FILTER_PHOTOS);
       return { ...p, photos: next };
     }),
   };

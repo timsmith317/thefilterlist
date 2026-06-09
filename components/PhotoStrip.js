@@ -10,6 +10,7 @@
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet, ActionSheetIOS, Alert, Platform } from 'react-native';
 import { useTheme } from '../theme/theme';
+import { photoUri } from '../lib/filterPhotos';
 
 export default function PhotoStrip({ photos = [], max = 3, onPick, onSaveToPhotos, onDelete }) {
   const t = useTheme();
@@ -68,7 +69,7 @@ export default function PhotoStrip({ photos = [], max = 3, onPick, onSaveToPhoto
           onPress={() => uri ? promptForFilled(i, uri) : promptForEmpty(i)}
         >
           {uri ? (
-            <Image source={{ uri }} style={s.img} />
+            <Image source={{ uri: photoUri(uri) }} style={s.img} />
           ) : (
             <Text style={s.plus}>+</Text>
           )}
