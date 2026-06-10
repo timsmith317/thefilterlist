@@ -1,126 +1,131 @@
 // components/IconPickerModal.js — choose a Device's icon.
 //
-// Same dim/slide bottom-sheet family as NotesModal / ManualPickerModal. Two
-// ways to set the icon:
-//   1. AUTO — clears the override; the device falls back to the derived
-//      water/air/other glyph (its default behavior).
-//   2. A grid of glyph tiles (SF Symbols). It leads with the app's own water
-//      (SF "humidity") and air (SF "fan") marks so they're first-class picks,
-//      then common home / auto / appliance symbols. Tiles show the glyph only —
-//      no cryptic symbol names for the user to decode.
+// iOS SHEET picker (presentationStyle="pageSheet"): the card is inset from the
+// top with rounded corners and the form peeks behind it, so it clearly reads as
+// a modal — no dim ambiguity, and no competing Save button to confuse with this
+// screen's controls.
 //
-// No free-text field: names like "humidity" mean nothing to users, and a text
-// input inside a bottom sheet traps the keyboard. To offer more symbols, just
-// extend CURATED below (verify names in Apple's SF Symbols app).
+// A sectioned grid of glyph tiles (SF Symbols). Leads with the app's own water
+// (SF "humidity") and air (SF "fan") marks, then water / air & climate / home &
+// appliances / auto / utility families. Tiles show the glyph only — no cryptic
+// symbol names for the user to decode.
 //
-// onSave returns the chosen SF Symbol name, or null for AUTO. expo-symbols is a
-// native module — symbols render only in a dev/standalone build, not Expo Go.
+// NO "AUTO" CHOICE: a device with no icon override already derives its glyph
+// from the filters attached to it (see DeviceIcon / deviceDisplayType). So a
+// user who never opens this picker, or picks nothing, gets the automatic glyph
+// for free. The picker's only job is to SET an explicit symbol.
+//
+// TAP TO APPLY: tapping any glyph applies it and closes immediately (onSave).
+// The header has a single Cancel; there's no separate Done step.
+//
+// onSave returns the chosen SF Symbol name. expo-symbols is a native module —
+// symbols render only in a dev/standalone build, not Expo Go.
+//
+// TO ADD MORE SYMBOLS: extend a section's `names` in SECTIONS below. Verify
+// names in Apple's SF Symbols app — an unknown name renders the generic
+// fallback tile (IconOther) instead of the symbol, so prune any tile that shows
+// the plain divider glyph on your OS version. Many appliance/auto symbols are
+// iOS 17+ (fine on current devices).
 
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet, Animated, Easing } from 'react-native';
+import React from 'react';
+import { View, Text, Pressable, Modal, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '../theme/theme';
 import { IconOther } from '../theme/Icons';
 
-const SLIDE_DISTANCE = 600;
-const OPEN_DURATION = 280;
-const CLOSE_DURATION = 220;
-
-// Glyph grid. Leads with the app's own water/air marks (SF "humidity"/"fan"),
-// then common appliance/home/water symbols. Edit freely; an unknown name simply
-// renders the generic fallback tile.
-const CURATED = [
-  'humidity',                          // water (the app's built-in water mark)
-  'fan',                               // air (the app's built-in air mark)
-  'drop.fill',
-  'refrigerator.fill',
-  'air.conditioner.horizontal.fill',
-  'humidifier.fill',
-  'wind',
-  'house.fill',
-  'car.fill',
-  'washer.fill',
-  'shower.fill',
-  'spigot.fill',
-  'flame.fill',
-  'thermometer',
-  'gauge.with.dots.needle.bottom.50percent',
+// Glyph grid, grouped into sections. The first section leads with the app's own
+// water/air marks. Sibling-of-verified names (the iOS-17 appliance/home/auto
+// family) are used liberally; unknowns fall back to the generic tile.
+const SECTIONS = [
+  {
+    title: 'Suggested',
+    names: ['humidity', 'fan', 'drop.fill', 'wind', 'house.fill', 'car.fill'],
+  },
+  {
+    title: 'Water',
+    names: [
+      'drop', 'drop.fill', 'spigot.fill', 'shower.fill', 'bathtub.fill',
+      'sink.fill', 'toilet.fill', 'waterbottle.fill', 'humidity', 'camera.filters',
+    ],
+  },
+  {
+    title: 'Air & Climate',
+    names: [
+      'fan', 'wind', 'air.conditioner.horizontal.fill', 'air.conditioner.vertical.fill',
+      'air.purifier.fill', 'humidifier.fill', 'thermometer', 'thermometer.medium',
+      'heater.vertical.fill', 'snowflake', 'flame.fill',
+    ],
+  },
+  {
+    title: 'Home & Appliances',
+    names: [
+      'house.fill', 'refrigerator.fill', 'washer.fill', 'dryer.fill', 'dishwasher.fill',
+      'oven.fill', 'microwave.fill', 'cooktop.fill', 'lightbulb.fill', 'powerplug.fill',
+    ],
+  },
+  {
+    title: 'Auto',
+    names: ['car.fill', 'bolt.car.fill', 'fuelpump.fill', 'engine.combustion.fill', 'steeringwheel'],
+  },
+  {
+    title: 'Utility',
+    names: [
+      'gauge.with.dots.needle.bottom.50percent', 'gearshape.fill', 'wrench.and.screwdriver.fill',
+      'bolt.fill', 'leaf.fill', 'line.3.horizontal.decrease', 'sparkles',
+    ],
+  },
 ];
 
 export default function IconPickerModal({ visible, value = null, onCancel, onSave }) {
   const t = useTheme();
   const s = makeStyles(t);
-  const [internalVisible, setInternalVisible] = useState(false);
-  const [selected, setSelected] = useState('');   // '' = Auto
-  const slideAnim = useRef(new Animated.Value(SLIDE_DISTANCE)).current;
-
-  useEffect(() => {
-    if (visible) {
-      setSelected(value || '');
-      setInternalVisible(true);
-      slideAnim.setValue(SLIDE_DISTANCE);
-      Animated.timing(slideAnim, {
-        toValue: 0, duration: OPEN_DURATION, easing: Easing.out(Easing.cubic), useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: SLIDE_DISTANCE, duration: CLOSE_DURATION, easing: Easing.in(Easing.cubic), useNativeDriver: true,
-      }).start(({ finished }) => { if (finished) setInternalVisible(false); });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  const done = () => onSave(selected.trim() ? selected.trim() : null);
 
   return (
-    <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
-      <View style={{ flex: 1 }}>
-        <Pressable style={s.backdrop} onPress={onCancel} />
-        <View style={s.dock} pointerEvents="box-none">
-          <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
-            <View style={s.head}>
-              <View style={s.headSlot}>
-                <Pressable onPress={onCancel} hitSlop={10}><Text style={s.cancel}>Cancel</Text></Pressable>
-              </View>
-              <Text style={s.title}>Icon</Text>
-              <View style={[s.headSlot, s.headSlotRight]}>
-                <Pressable onPress={done} hitSlop={10} style={s.donePill}><Text style={s.doneTxt}>Done</Text></Pressable>
-              </View>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
+      <View style={s.root}>
+        <SafeAreaView style={s.safe} edges={['bottom']}>
+          <View style={s.head}>
+            <View style={s.headSlot}>
+              <Pressable onPress={onCancel} hitSlop={10}><Text style={s.cancel}>Cancel</Text></Pressable>
             </View>
+            <Text style={s.title}>Choose Icon</Text>
+            <View style={[s.headSlot, s.headSlotRight]} />
+          </View>
 
-            <View style={s.body}>
-              {/* AUTO */}
-              <Pressable style={[s.autoRow, selected === '' && s.autoRowOn]} onPress={() => setSelected('')}>
-                <View style={s.autoIcon}><IconOther size={22} color={t.iconInk} /></View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.autoName}>Auto</Text>
-                  <Text style={s.autoSub} numberOfLines={1}>Match the filters attached to this device</Text>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+          >
+            {SECTIONS.map(section => (
+              <View key={section.title}>
+                <Text style={s.kicker}>{section.title.toUpperCase()}</Text>
+                <View style={s.grid}>
+                  {section.names.map((name, i) => {
+                    const on = value === name;
+                    return (
+                      <Pressable
+                        key={section.title + ':' + name + ':' + i}
+                        style={[s.tile, on && s.tileOn]}
+                        onPress={() => onSave(name)}
+                      >
+                        <SymbolView
+                          name={name}
+                          type="monochrome"
+                          tintColor={t.iconInk}
+                          size={28}
+                          resizeMode="scaleAspectFit"
+                          fallback={<IconOther size={28} color={t.iconInk} />}
+                        />
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                {selected === '' && <Text style={s.check}>✓</Text>}
-              </Pressable>
-
-              {/* GLYPH GRID */}
-              <Text style={[s.kicker, { marginTop: 22 }]}>CHOOSE A SYMBOL</Text>
-              <View style={s.grid}>
-                {CURATED.map(name => {
-                  const on = selected === name;
-                  return (
-                    <Pressable key={name} style={[s.tile, on && s.tileOn]} onPress={() => setSelected(name)}>
-                      <SymbolView
-                        name={name}
-                        type="monochrome"
-                        tintColor={t.iconInk}
-                        size={26}
-                        resizeMode="scaleAspectFit"
-                        fallback={<IconOther size={26} color={t.iconInk} />}
-                      />
-                    </Pressable>
-                  );
-                })}
               </View>
-            </View>
-          </Animated.View>
-        </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -128,49 +133,26 @@ export default function IconPickerModal({ visible, value = null, onCancel, onSav
 
 function makeStyles(t) {
   return StyleSheet.create({
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
-    dock: { flex: 1, justifyContent: 'flex-end' },
-
-    sheet: {
-      backgroundColor: t.bg,
-      borderTopLeftRadius: 18,
-      borderTopRightRadius: 18,
-      paddingBottom: 28,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: 0.18,
-      shadowRadius: 16,
-      elevation: 10,
-    },
+    root: { flex: 1, backgroundColor: t.bg },
+    safe: { flex: 1 },
 
     head: {
       flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
+      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 12,
       borderBottomWidth: 1, borderBottomColor: t.line,
     },
     headSlot: { flex: 1, justifyContent: 'center', alignItems: 'flex-start' },
     headSlotRight: { alignItems: 'flex-end' },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink, textAlign: 'center' },
-    donePill: { backgroundColor: t.tabIdleBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, minWidth: 72, alignItems: 'center' },
-    doneTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    cancel: { color: t.inkSoft, fontSize: 16 },
+    title: { fontSize: 16, fontWeight: '700', color: t.ink, textAlign: 'center' },
 
-    body: { paddingHorizontal: 20, paddingTop: 18 },
-    kicker: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginBottom: 10 },
+    scroll: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40 },
 
-    autoRow: {
-      flexDirection: 'row', alignItems: 'center',
-      padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
-    },
-    autoRowOn: { borderColor: t.ink },
-    autoIcon: { width: 30, alignItems: 'center', marginRight: 10 },
-    autoName: { fontSize: 15, fontWeight: '700', color: t.ink },
-    autoSub: { fontSize: 12.5, color: t.muted, marginTop: 2 },
-    check: { fontSize: 16, fontWeight: '700', color: t.ink, marginLeft: 8 },
+    kicker: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 24, marginBottom: 12 },
 
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
     tile: {
-      width: 56, height: 56, borderRadius: 12,
+      width: 60, height: 60, borderRadius: 14,
       borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
       alignItems: 'center', justifyContent: 'center',
     },
