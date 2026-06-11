@@ -81,7 +81,9 @@ export default function PhotoStrip({ photos = [], max = 3, onPick, onSaveToPhoto
 
 function makeStyles(t) {
   return StyleSheet.create({
-    row: { flexDirection: 'row', gap: 10 },
+    // space-between pins the first/last slots to the row edges (so they align
+    // with the full-width input above) and spaces the rest evenly.
+    row: { flexDirection: 'row', justifyContent: 'space-between' },
     slot: { width: 96, height: 96, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     slotEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.iconBorder, backgroundColor: t.card },
     slotFilled: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line },

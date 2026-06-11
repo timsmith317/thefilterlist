@@ -41,7 +41,10 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEY = 'thefilterlist.data.v5';
+// Exported so lib/backup.js reads/writes the exact same key (single source of
+// truth). Without `export` here, backup.js's `import { KEY }` resolves to
+// undefined and backups silently capture nothing.
+export const KEY = 'thefilterlist.data.v5';
 const LEGACY_KEY_V1 = 'thefilterlist.data.v1';
 
 export const MAX_FILTER_PHOTOS = 3;
@@ -280,40 +283,36 @@ function seed() {
     // Assets are the single organizing dimension (no categories). `order`
     // drives the tab order on the home screen. Home/Auto/Work are the three
     // LOCKED defaults (see PROTECTED_ASSET_IDS) — always present, can't be
-    // renamed/archived/deleted, but CAN be reordered. They sort first; user
-    // assets (Main House, 2019 Civic below — both fully editable) follow.
+    // renamed/archived/deleted, but CAN be reordered. ensureDefaultAssets()
+    // guarantees them on every load, so the seed only needs to list them.
     assets: [
       { id: 'a_home', name: 'Home', archived: false, order: 0 },
       { id: 'a_auto', name: 'Auto', archived: false, order: 1 },
       { id: 'a_work', name: 'Work', archived: false, order: 2 },
-      { id: 'a_house', name: 'Main House', archived: false, order: 3 },
-      { id: 'a_civic', name: '2019 Civic', archived: false, order: 4 },
     ],
     // Filters own the recommended replacement interval (intervalDays).
     filters: [
-      { id: 'f_merv11', name: '20x25x1 MERV 11', type: 'air', sku: 'FPR1500-20251', reorderUrl: 'https://www.amazon.com/dp/B07BR9D77Q', photos: [], onHand: 2, lowStockThreshold: 1, intervalDays: 90 },
-      { id: 'f_edr1',   name: 'EveryDrop EDR1RXD1', type: 'water', sku: 'EDR1RXD1', reorderUrl: 'https://www.amazon.com/dp/B00YQ3L0DG', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 180 },
-      { id: 'f_ro50',   name: 'RO Membrane 50 GPD', type: 'water', sku: 'TFC-50', reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 730 },
-      { id: 'f_ro_sed', name: 'Sediment Pre-Filter 5µ', type: 'water', sku: 'SED-10-5', reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 180 },
-      { id: 'f_ro_carbon', name: 'Carbon Block CTO', type: 'water', sku: 'CTO-10', reorderUrl: '', photos: [], onHand: 0, lowStockThreshold: 1, intervalDays: 365 },
-      { id: 'f_cf10',   name: 'Cabin Air CF10285', type: 'air', sku: 'CF10285', reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 365 },
-      { id: 'f_ca10',   name: 'Engine Air CA10755', type: 'air', sku: 'CA10755', reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 365 },
-      { id: 'f_merv8',  name: '16x20x1 MERV 8', type: 'air', sku: 'MERV8-16201', reorderUrl: '', photos: [], onHand: 3, lowStockThreshold: 2, intervalDays: 90 },
+      { id: 'f_merv11',    name: '20x25x1 MERV 11',        type: 'air',   sku: 'FPR1500-20251', reorderUrl: 'https://www.amazon.com/dp/B07BR9D77Q', photos: [], onHand: 2, lowStockThreshold: 1, intervalDays: 90 },
+      { id: 'f_ro50',      name: 'RO Membrane 50 GPD',     type: 'water', sku: 'TFC-50',        reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 730 },
+      { id: 'f_ro_sed',    name: 'Sediment Pre-Filter 5µ', type: 'water', sku: 'SED-10-5',      reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 180 },
+      { id: 'f_ro_carbon', name: 'Carbon Block CTO',       type: 'water', sku: 'CTO-10',        reorderUrl: '', photos: [], onHand: 0, lowStockThreshold: 1, intervalDays: 365 },
+      { id: 'f_cf10',      name: 'Malibu Cabin Air',       type: 'air',   sku: 'CF10285',       reorderUrl: '', photos: [], onHand: 1, lowStockThreshold: 1, intervalDays: 365 },
+      { id: 'f_merv8',     name: '16x20x1 MERV 8',         type: 'air',   sku: 'MERV8-16201',   reorderUrl: '', photos: [], onHand: 3, lowStockThreshold: 2, intervalDays: 90 },
     ],
-    // The Under-Sink RO (f3) is a 3-stage unit demoing multi-filter devices.
-    // normalizeDevice() runs on load to fill in stage ids + the mirror. Each
-    // stage's intervalDays is the filterless fallback; the linked filter's wins.
+    // The Under-Sink RO (d3) is a 3-stage unit demoing multi-filter devices.
+    // normalizeDevice() runs on load to fill in stage ids + the device mirror,
+    // so the seed omits both. Each stage's intervalDays is the filterless
+    // fallback; the linked filter's interval wins when present.
     devices: [
-      { id: 'd1', assetId: 'a_house', name: 'Living Room Furnace', stages: [{ intervalDays: 90,  lastReplaced: iso(84),  filterId: 'f_merv11' }] },
-      { id: 'd2', assetId: 'a_house', name: 'Kitchen Fridge', model: 'WRX735SDHZ', serial: 'HRA0412345', productUrl: 'https://www.whirlpool.com/refrigerators.html', manualUrl: 'https://www.whirlpool.com/owners.html', stages: [{ intervalDays: 180, lastReplaced: iso(200), filterId: 'f_edr1' }] },
-      { id: 'd3', assetId: 'a_house', name: 'Under-Sink RO',       stages: [
+      { id: 'd1', assetId: 'a_home', name: 'Living Room Furnace', stages: [{ intervalDays: 90, lastReplaced: iso(84), filterId: 'f_merv11' }] },
+      { id: 'd2', assetId: 'a_home', name: 'Kitchen Fridge', model: 'WRX735SDHZ', serial: 'HRA0412345', productUrl: 'https://www.whirlpool.com/refrigerators.html', manualUrl: 'https://www.whirlpool.com/owners.html', icon: 'refrigerator.fill', stages: [{ intervalDays: 180, lastReplaced: iso(0), filterId: 'f_ro_sed' }] },
+      { id: 'd3', assetId: 'a_home', name: 'Under-Sink RO', stages: [
         { intervalDays: 180, lastReplaced: iso(170), filterId: 'f_ro_sed' },     // ~10d left
         { intervalDays: 365, lastReplaced: iso(120), filterId: 'f_ro_carbon' },  // healthy, but out of stock
         { intervalDays: 730, lastReplaced: iso(120), filterId: 'f_ro50' },       // long-life membrane
       ] },
-      { id: 'd4', assetId: 'a_civic', name: 'Cabin Air Filter',  stages: [{ intervalDays: 365, lastReplaced: iso(351), filterId: 'f_cf10' }] },
-      { id: 'd5', assetId: 'a_civic', name: 'Engine Air Filter', stages: [{ intervalDays: 365, lastReplaced: iso(30),  filterId: 'f_ca10' }] },
-      { id: 'd6', assetId: 'a_work', name: 'Office HVAC',       stages: [{ intervalDays: 90,  lastReplaced: iso(81),  filterId: 'f_merv8' }] },
+      { id: 'd4', assetId: 'a_auto', name: 'Chevrolet Malibu', icon: 'car.fill', stages: [{ intervalDays: 365, lastReplaced: iso(351), filterId: 'f_cf10' }] },
+      { id: 'd6', assetId: 'a_work', name: 'Office HVAC', stages: [{ intervalDays: 90, lastReplaced: iso(81), filterId: 'f_merv8' }] },
     ],
     settings: {
       reminders: {
@@ -452,7 +451,10 @@ export async function loadData() {
       const parsed = JSON.parse(v2);
       // Defensive: ensure filters have photos:[] (covers users who saved before this field existed)
       if (parsed.filters) parsed.filters = parsed.filters.map(p => ({ ...p, photos: p.photos || [] }));
-      return ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(parsed)))))))));
+      const starter = parsed.__starter; // preserve the sample-data marker across migrations
+      const out = ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(parsed)))))))));
+      if (starter) out.__starter = starter;
+      return out;
     }
     const v1raw = await AsyncStorage.getItem(LEGACY_KEY_V1);
     if (v1raw) {
@@ -463,6 +465,7 @@ export async function loadData() {
     }
   } catch (e) { console.warn('loadData failed', e); }
   const fresh = ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(seed())))));
+  fresh.__starter = buildStarterMarker(fresh); // arm "Delete Sample Data" — fresh install only
   await saveData(fresh);
   return fresh;
 }
@@ -481,8 +484,107 @@ export async function saveData(data) {
 
 export async function resetToSeed() {
   const fresh = ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(seed())))));
+  fresh.__starter = buildStarterMarker(fresh);
   await saveData(fresh);
   return fresh;
+}
+
+// ---------------------------------------------------------------------------
+// Starter (sample) data marker + clear
+// ---------------------------------------------------------------------------
+// A fresh install seeds demo data and stamps `data.__starter` — a snapshot of
+// each seeded device/filter's content signature. This powers a "Delete Sample
+// Data" action that removes ONLY items the user never touched: an entity is
+// cleared only if it still matches its seeded signature, so anything edited,
+// restocked, marked-replaced, or newly added is kept.
+//
+// The marker is deliberately scoped to the original install:
+//   • It is NEVER written to a backup (lib/backup.js strips it on export), so
+//     restoring a backup — even of pristine seed — lands as the user's own
+//     data and is never re-deletable as "sample".
+//   • It is removed once sample data is cleared.
+//   • Only a true fresh install (empty storage -> seed()) re-arms it.
+//
+// The signature ignores derived/volatile fields normalizeDevice() fills in
+// (stage ids, the device-level mirror), so it stays valid across reloads.
+
+function starterDeviceSig(d) {
+  return JSON.stringify({
+    name: d.name || '',
+    assetId: d.assetId || '',
+    model: d.model || '',
+    serial: d.serial || '',
+    productUrl: d.productUrl || '',
+    manualUrl: d.manualUrl || '',
+    icon: d.icon || null,
+    notes: d.notes || '',
+    stages: (d.stages || []).map(s => ({
+      intervalDays: s.intervalDays ?? null,
+      lastReplaced: s.lastReplaced ?? null,
+      filterId: s.filterId ?? null,
+    })),
+  });
+}
+
+function starterFilterSig(f) {
+  return JSON.stringify({
+    name: f.name || '',
+    type: f.type || '',
+    sku: f.sku || '',
+    reorderUrl: f.reorderUrl || '',
+    onHand: f.onHand ?? 0,
+    lowStockThreshold: f.lowStockThreshold ?? 0,
+    intervalDays: f.intervalDays ?? null,
+    photos: f.photos || [],
+  });
+}
+
+function buildStarterMarker(data) {
+  const devices = {};
+  for (const d of data.devices || []) devices[d.id] = starterDeviceSig(d);
+  const filters = {};
+  for (const f of data.filters || []) filters[f.id] = starterFilterSig(f);
+  return { v: 1, devices, filters };
+}
+
+// Seeded ids that are still pristine (present AND unchanged) in `data`.
+function pristineStarterIds(data) {
+  const mark = data && data.__starter;
+  if (!mark) return { devices: [], filters: [] };
+  const devices = (data.devices || [])
+    .filter(d => mark.devices && mark.devices[d.id] === starterDeviceSig(d))
+    .map(d => d.id);
+  const filters = (data.filters || [])
+    .filter(f => mark.filters && mark.filters[f.id] === starterFilterSig(f))
+    .map(f => f.id);
+  return { devices, filters };
+}
+
+// True while "Delete Sample Data" should show: the marker exists and at least
+// one seeded device or filter is still untouched. Manual deletion of the seed
+// items naturally drives this to false (nothing left to match).
+export function hasStarterData(data) {
+  const { devices, filters } = pristineStarterIds(data);
+  return devices.length > 0 || filters.length > 0;
+}
+
+// Remove ONLY untouched seeded items, persist an "owned" dataset (marker gone),
+// and return it. Edited/added items are kept. A pristine seeded filter is kept
+// if any surviving device still uses it, so we never orphan a user's device.
+export async function clearStarterData() {
+  const data = await loadData();
+  if (!data.__starter) return data; // not armed — nothing to do
+  const { devices: pd, filters: pf } = pristineStarterIds(data);
+  const removeDevices = new Set(pd);
+  const keptDevices = (data.devices || []).filter(d => !removeDevices.has(d.id));
+  const usedByKept = new Set();
+  for (const d of keptDevices) for (const s of (d.stages || [])) if (s.filterId) usedByKept.add(s.filterId);
+  const removeFilters = new Set(pf.filter(id => !usedByKept.has(id)));
+  const keptFilters = (data.filters || []).filter(f => !removeFilters.has(f.id));
+  const next = { ...data, devices: keptDevices, filters: keptFilters };
+  delete next.__starter;
+  await saveData(next);
+  return next;
 }
 
 // ---------------------------------------------------------------------------

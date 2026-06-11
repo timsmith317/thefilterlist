@@ -3,7 +3,7 @@
 // Backup & Restore screen.
 //
 // Export flow:
-//   tap [Backup] → exportBackup() writes .device file →
+//   tap [Backup] → exportBackup() writes .filter file →
 //   shareBackup() opens iOS share sheet → user picks Files / AirDrop / etc.
 //
 // Restore flow:
@@ -16,20 +16,30 @@
 // all data" warning lives in the preview modal + the destructive Alert,
 // NOT on the main Restore card — the warning fires at the moment of
 // action, where it actually matters.
+//
+// Delete Sample Data:
+//   Fresh installs seed demo data (see data/store.js seed()). This screen
+//   shows a quiet "Delete Sample Data" action at the bottom while any
+//   untouched sample items remain — it removes ONLY pristine seed items, so
+//   anything the user edited or added is kept. hasStarterData() drives its
+//   visibility, re-checked on focus so deleting the seed items by hand hides
+//   it too. Restoring any backup permanently disarms it (the marker is never
+//   carried in a backup file).
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, Pressable, StyleSheet, ScrollView, Modal, Alert,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
 import {
   exportBackup, shareBackup,
   pickBackupFile, readAndValidateBackup, applyRestore,
 } from '../../lib/backup';
+import { loadData, hasStarterData, clearStarterData } from '../../data/store';
 
 function formatDate(iso) {
   if (!iso) return 'Unknown';
@@ -51,8 +61,20 @@ export default function BackupSettings() {
   const [picking, setPicking] = useState(false);
   const [preview, setPreview] = useState(null);   // { parsed, stats } | null
   const [restoring, setRestoring] = useState(false);
+  const [data, setData] = useState(null);
+  const [clearing, setClearing] = useState(false);
 
   const s = makeStyles(t);
+
+  const refreshData = useCallback(async () => {
+    try { setData(await loadData()); } catch (e) { /* leave data as-is */ }
+  }, []);
+
+  // Re-check on every focus so the button reflects manual deletions made
+  // elsewhere (deleting the seed items by hand should hide it too).
+  useFocusEffect(useCallback(() => { refreshData(); }, [refreshData]));
+
+  const showClear = !!data && hasStarterData(data);
 
   const onExport = async () => {
     try {
@@ -136,6 +158,27 @@ export default function BackupSettings() {
     }
   };
 
+  const onDeleteSample = () => {
+    Alert.alert(
+      'Delete Sample Data?',
+      'This removes the built-in sample data. None of your own data will be touched.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDeleteSample },
+      ]
+    );
+  };
+
+  const doDeleteSample = async () => {
+    try {
+      setClearing(true);
+      const next = await clearStarterData();
+      setData(next); // marker gone -> showClear flips false, button hides
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
@@ -153,9 +196,9 @@ export default function BackupSettings() {
         <Text style={s.label}>BACKUP</Text>
         <View style={s.card}>
           <Text style={s.cardBody}>
-            Creates a single file with your categories, assets, devices,
-            filters, reminders, and reference photos. Save it to Files,
-            AirDrop it, or send it to yourself for safekeeping.
+            Creates a single file with your assets, devices, filters,
+            reminders, and reference photos. Save it to Files, AirDrop it,
+            or send it to yourself for safekeeping.
           </Text>
           <Pressable
             style={[s.actionBtnPrimary, exporting && s.btnDim]}
@@ -188,6 +231,25 @@ export default function BackupSettings() {
               : <Text style={s.actionBtnSecondaryTxt}>Restore</Text>}
           </Pressable>
         </View>
+
+        {/* DELETE SAMPLE DATA — only while untouched seed items remain.
+            Clears ONLY pristine sample items; edited/added data is kept. */}
+        {showClear && (
+          <View style={s.sampleWrap}>
+            <Pressable
+              style={[s.sampleBtn, clearing && s.btnDim]}
+              onPress={onDeleteSample}
+              disabled={clearing}
+            >
+              {clearing
+                ? <ActivityIndicator color={t.muted} />
+                : <Text style={s.sampleBtnTxt}>Delete Sample Data</Text>}
+            </Pressable>
+            <Text style={s.sampleHint}>
+              Removes the built-in sample data. None of your own data will be touched.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Preview modal — shows the backup's contents before destructive confirm */}
@@ -210,7 +272,6 @@ export default function BackupSettings() {
               </Text>
 
               <View style={s.statsList}>
-                <StatRow label="Categories" value={preview?.stats?.categoryCount ?? 0} s={s} />
                 <StatRow label="Assets"     value={preview?.stats?.assetCount ?? 0} s={s} />
                 <StatRow label="Devices"    value={preview?.stats?.deviceCount ?? 0} s={s} />
                 <StatRow label="Filters"      value={preview?.stats?.filterCount ?? 0} s={s} />
@@ -311,6 +372,20 @@ function makeStyles(t) {
     actionBtnSecondaryTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
 
     btnDim: { opacity: 0.6 },
+
+    // Delete Sample Data — quiet, centered, no fill. Red text signals the
+    // destructive nature without a loud filled button at the foot of a
+    // normal settings screen.
+    sampleWrap: { marginTop: 4, marginBottom: 8, alignItems: 'center' },
+    sampleBtn: {
+      paddingVertical: 10, paddingHorizontal: 22,
+      minHeight: 44, alignItems: 'center', justifyContent: 'center',
+    },
+    sampleBtnTxt: { fontSize: 15, fontWeight: '700', color: t.status.red.pillInk },
+    sampleHint: {
+      fontSize: 12, color: t.muted, textAlign: 'center',
+      marginTop: 2, paddingHorizontal: 24, lineHeight: 17,
+    },
 
     // Modal styles (matching the pattern from categories.js / assets.js)
     modalRoot: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },

@@ -1,21 +1,27 @@
-// components/PhotoCropper.js — full-screen pinch-zoom-pan cropper for Filter
-// reference photos. Replaces iOS's built-in "Move and Scale" editor, which is
-// square-fill only (zoom IN only). Here userScale starts at 1 = the WHOLE image
-// fit inside the square frame, so you can keep the entire (tall) device OR zoom
-// in to crop tighter.
+// components/PhotoCropper.js — pinch-zoom-pan cropper for Filter reference
+// photos. Replaces iOS's built-in "Move and Scale" editor, which is square-fill
+// only (zoom IN only). Here userScale starts at 1 = the WHOLE image fit inside
+// the square frame, so you can keep the entire (tall) device OR zoom in to crop
+// tighter.
 //
-// Geometry lives in lib/cropmath.js (pure + unit-tested). On "Use" we map the
+// Presented as the same themed iOS SHEET (presentationStyle="pageSheet") the
+// photo viewer / pickers use: white background, the photo in a centered framed
+// card, ‹ Back + a standard "Add" PillButton in the header. Only the look
+// changed — the crop frame, gestures, and geometry are unchanged.
+//
+// Geometry lives in lib/cropmath.js (pure + unit-tested). On "Add" we map the
 // square frame back to source pixels and crop via expo-image-manipulator.
 //
 // Deps already in the app: react-native-gesture-handler, react-native-reanimated.
 // New dep: expo-image-manipulator (used inside lib/filterPhotos.cropAndPersist).
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { useTheme } from '../theme/theme';
+import { BackButton, PillButton } from './HeaderBits';
 import { baseScaleFor, clampPan, computeCropRect } from '../lib/cropmath';
 import { cropAndPersist } from '../lib/filterPhotos';
 
@@ -90,16 +96,19 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
       <GestureHandlerRootView style={s.root}>
-        <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-          <View style={s.hint}><Text style={s.hintTxt}>Pinch to zoom · drag to position</Text></View>
+        <SafeAreaView style={s.safe} edges={['bottom']}>
+          <View style={s.head}>
+            <BackButton onPress={onCancel} />
+            <PillButton label="Add" onPress={onUse} />
+          </View>
 
           <View
             style={s.area}
             onLayout={e => {
               const { width, height } = e.nativeEvent.layout;
-              setFrame(Math.max(0, Math.min(width, height) - 24));
+              setFrame(Math.max(0, Math.min(width, height) - 36));
             }}
           >
             {asset && dims && frame > 0 && (
@@ -113,18 +122,16 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
                     />
                   </Animated.View>
                 </GestureDetector>
+                {busy && (
+                  <View style={s.busyOverlay} pointerEvents="none">
+                    <ActivityIndicator color={t.ink} />
+                  </View>
+                )}
               </View>
             )}
           </View>
 
-          <View style={s.footer}>
-            <Pressable onPress={onCancel} hitSlop={10} disabled={busy}>
-              <Text style={s.cancel}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={onUse} hitSlop={10} disabled={busy} style={s.useBtn}>
-              {busy ? <ActivityIndicator color={t.ink} /> : <Text style={s.useTxt}>Use</Text>}
-            </Pressable>
-          </View>
+          <View style={s.hint}><Text style={s.hintTxt}>Pinch to zoom · drag to position</Text></View>
         </SafeAreaView>
       </GestureHandlerRootView>
     </Modal>
@@ -133,20 +140,29 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
 
 function makeStyles(t) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#000' },
+    root: { flex: 1, backgroundColor: t.bg },
     safe: { flex: 1 },
-    hint: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
-    hintTxt: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600' },
-    area: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    // Square frame; overflow hidden so the preview shows EXACTLY what's kept.
-    frame: { overflow: 'hidden', backgroundColor: '#111', borderRadius: 2 },
-    gestureLayer: { alignItems: 'center', justifyContent: 'center' },
-    footer: {
+
+    head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 22, paddingVertical: 14,
+      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
     },
-    cancel: { color: 'rgba(255,255,255,0.85)', fontSize: 16 },
-    useBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 999, backgroundColor: '#fff', minWidth: 64, alignItems: 'center' },
-    useTxt: { color: '#000', fontSize: 16, fontWeight: '700' },
+
+    area: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    // Square crop frame, matched to the photo viewer's framed card. overflow
+    // hidden so the preview shows EXACTLY what's kept (clipped to rounded corners).
+    frame: {
+      overflow: 'hidden', borderRadius: 16,
+      backgroundColor: t.card, borderWidth: 1.5, borderColor: t.iconBorder,
+    },
+    gestureLayer: { alignItems: 'center', justifyContent: 'center' },
+    busyOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.35)',
+    },
+
+    hint: { alignItems: 'center', paddingVertical: 16 },
+    hintTxt: { color: t.muted, fontSize: 13, fontWeight: '600' },
   });
 }

@@ -9,11 +9,12 @@
 // entry needed.
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
+import { replayOnboarding } from '../../components/OnboardingModal';
 
 export default function Help() {
   const t = useTheme();
@@ -98,6 +99,12 @@ export default function Help() {
         <Text style={s.li}>3.  Attach the Filters it uses, and set each filter's interval.</Text>
         <Text style={s.p}>Keep a low-stock threshold so the inventory warns you in time, and back up before reinstalling.</Text>
 
+        <Text style={s.h}>Welcome tour</Text>
+        <Text style={s.p}>Want the intro again? Replay the welcome walkthrough anytime.</Text>
+        <Pressable style={s.replayBtn} onPress={replayOnboarding}>
+          <Text style={s.replayBtnTxt}>Replay intro</Text>
+        </Pressable>
+
         <View style={{ height: 16 }} />
       </ScrollView>
     </SafeAreaView>
@@ -126,5 +133,13 @@ function makeStyles(t) {
     legend: { marginTop: 12, paddingLeft: 16, gap: 9 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     dot: { width: 10, height: 10, borderRadius: 5 },
+
+    replayBtn: {
+      alignSelf: 'flex-start', marginLeft: 16, marginTop: 14,
+      paddingVertical: 12, paddingHorizontal: 24,
+      borderRadius: 10, backgroundColor: t.tabIdleBg,
+      minHeight: 44, alignItems: 'center', justifyContent: 'center',
+    },
+    replayBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
   });
 }

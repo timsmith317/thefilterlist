@@ -21,7 +21,7 @@
 // in app/_layout.js. Native module — needs a dev rebuild to take effect.
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Linking, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Linking, Alert, Image } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -29,10 +29,12 @@ import { useTheme } from '../../theme/theme';
 import { BackButton, PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
 import PhotoCropper from '../../components/PhotoCropper';
+import PhotoViewerModal from '../../components/PhotoViewerModal';
+import CameraCaptureModal from '../../components/CameraCaptureModal';
 import IntervalField from '../../components/IntervalField';
 import { loadData, saveData, updateFilter, deleteFilter, devicesUsingFilter, isFilterLow, addFilterPhoto, removeFilterPhoto, FILTER_TYPES, MAX_FILTER_PHOTOS, DEFAULT_INTERVAL_DAYS } from '../../data/store';
 import { intervalToDays, daysToInterval, INTERVAL_UNITS } from '../../lib/interval';
-import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/filterPhotos';
+import { pickFromLibrary, saveToPhotos, deleteFile, photoUri } from '../../lib/filterPhotos';
 
 // "Every 90 days" / "Every 6 months" / "Every 1 year" (singular-aware).
 function verboseInterval(days) {
@@ -51,6 +53,9 @@ export default function FilterDetail() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const [cropAsset, setCropAsset] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStart, setViewerStart] = useState(0);
   const s = makeStyles(t);
 
   useFocusEffect(useCallback(() => {
@@ -84,7 +89,10 @@ export default function FilterDetail() {
   const filterInterval = filter.intervalDays != null ? filter.intervalDays : DEFAULT_INTERVAL_DAYS;
 
   const save = async () => {
-    const { intervalValue, intervalUnit, ...rest } = draft;
+    // Photos are managed live on `data` (added/removed and persisted immediately),
+    // so omit the draft's photo list from the patch — it's a snapshot from when
+    // editing began, and including it would overwrite just-added photos.
+    const { intervalValue, intervalUnit, photos: _photos, ...rest } = draft;
     const clean = {
       ...rest,
       intervalDays: intervalToDays(intervalValue, intervalUnit),
@@ -130,7 +138,8 @@ export default function FilterDetail() {
       Alert.alert('Limit reached', `You can add up to ${MAX_FILTER_PHOTOS} photos per filter.`);
       return;
     }
-    const asset = source === 'camera' ? await takePhoto() : await pickFromLibrary();
+    if (source === 'camera') { setCameraOpen(true); return; }
+    const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
   };
@@ -240,36 +249,67 @@ export default function FilterDetail() {
           <Text style={s.value}>Alert when {filter.lowStockThreshold} or less</Text>
         )}
 
-        <Text style={s.label}>SKU</Text>
         {editing ? (
-          <TextInput value={draft.sku} onChangeText={(v) => setDraft({ ...draft, sku: v })} placeholder="e.g. EDR1RXD1" placeholderTextColor={t.muted} style={s.input} autoCapitalize="characters" />
-        ) : (
-          <Text style={s.value}>{filter.sku || '—'}</Text>
-        )}
+          <>
+            <Text style={s.label}>SKU</Text>
+            <TextInput value={draft.sku} onChangeText={(v) => setDraft({ ...draft, sku: v })} placeholder="e.g. EDR1RXD1" placeholderTextColor={t.muted} style={s.input} autoCapitalize="characters" />
+          </>
+        ) : filter.sku ? (
+          <>
+            <Text style={s.label}>SKU</Text>
+            <Text style={s.value}>{filter.sku}</Text>
+          </>
+        ) : null}
 
-        <Text style={s.label}>REORDER URL</Text>
         {editing ? (
-          <TextInput value={draft.reorderUrl} onChangeText={(v) => setDraft({ ...draft, reorderUrl: v })} placeholder="https://..." placeholderTextColor={t.muted} style={s.input} autoCapitalize="none" autoCorrect={false} />
+          <>
+            <Text style={s.label}>REORDER URL</Text>
+            <TextInput value={draft.reorderUrl} onChangeText={(v) => setDraft({ ...draft, reorderUrl: v })} placeholder="https://..." placeholderTextColor={t.muted} style={s.input} autoCapitalize="none" autoCorrect={false} />
+          </>
         ) : filter.reorderUrl ? (
-          <Pressable onPress={openLink} style={s.openLink}>
-            <Text style={s.openLinkTxt} numberOfLines={1}>{filter.reorderUrl}</Text>
-            <Text style={s.openLinkArrow}>↗</Text>
-          </Pressable>
-        ) : (
-          <Text style={s.value}>—</Text>
-        )}
+          <>
+            <Text style={s.label}>REORDER URL</Text>
+            <Pressable onPress={openLink} style={s.openLink}>
+              <Text style={s.openLinkTxt} numberOfLines={1}>{filter.reorderUrl}</Text>
+              <Text style={s.openLinkArrow}>↗</Text>
+            </Pressable>
+          </>
+        ) : null}
 
-        <Text style={s.label}>PHOTOS</Text>
-        <View style={{ paddingLeft: 16 }}>
-          <PhotoStrip
-            photos={filter.photos || []}
-            max={MAX_FILTER_PHOTOS}
-            onPick={(source) => onPickPhoto(source)}
-            onSaveToPhotos={onSaveToPhotos}
-            onDelete={onDeletePhoto}
-          />
-        </View>
-        <Text style={s.hint}>Up to {MAX_FILTER_PHOTOS} reference photos.</Text>
+        {/* PHOTOS — edit mode: full editing via PhotoStrip (add/crop/save/delete).
+            View mode: read-only thumbnails (actual photos only, no empty slots);
+            tapping one opens the framed swipe/zoom viewer. Hidden entirely in
+            view mode when there are no photos. */}
+        {editing ? (
+          <>
+            <Text style={s.label}>PHOTOS</Text>
+            <View>
+              <PhotoStrip
+                photos={filter.photos || []}
+                max={MAX_FILTER_PHOTOS}
+                onPick={(source) => onPickPhoto(source)}
+                onSaveToPhotos={onSaveToPhotos}
+                onDelete={onDeletePhoto}
+              />
+            </View>
+            <Text style={s.hint}>Up to {MAX_FILTER_PHOTOS} reference photos.</Text>
+          </>
+        ) : (filter.photos || []).length > 0 ? (
+          <>
+            <Text style={s.label}>PHOTOS</Text>
+            <View style={s.thumbRow}>
+              {Array.from({ length: MAX_FILTER_PHOTOS }).map((_, i) => {
+                const p = (filter.photos || [])[i];
+                if (!p) return <View key={i} style={s.thumbSpacer} />;
+                return (
+                  <Pressable key={i} style={s.thumb} onPress={() => { setViewerStart(i); setViewerOpen(true); }}>
+                    <Image source={{ uri: photoUri(p) }} style={s.thumbImg} />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
 
         {/* Used By: informational, view-mode only — unchanged. */}
         {!editing && devices.length > 0 && (
@@ -299,6 +339,19 @@ export default function FilterDetail() {
         asset={cropAsset}
         onCancel={() => setCropAsset(null)}
         onDone={onCroppedPhoto}
+      />
+
+      <PhotoViewerModal
+        visible={viewerOpen}
+        photos={filter.photos || []}
+        index={viewerStart}
+        onClose={() => setViewerOpen(false)}
+      />
+
+      <CameraCaptureModal
+        visible={cameraOpen}
+        onCancel={() => setCameraOpen(false)}
+        onCapture={(asset) => { setCameraOpen(false); setCropAsset(asset); }}
       />
     </SafeAreaView>
   );
@@ -338,6 +391,16 @@ function makeStyles(t) {
     lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
 
     hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 16 },
+
+    // Read-only photo thumbnails (view mode). Match PhotoStrip's filled slot:
+    // square, card fill, thin line border, contain so the whole photo shows.
+    // Read-only photo thumbnails (view mode), laid out on the same 3-column grid
+    // as the edit strip: photos fill from the left, invisible spacers hold the
+    // empty columns, so the outer photos align with the fields above.
+    thumbRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    thumb: { width: 96, height: 96, borderRadius: 14, overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
+    thumbSpacer: { width: 96, height: 96 },
+    thumbImg: { width: '100%', height: '100%', resizeMode: 'contain' },
 
     usedBox: { backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
     usedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.line },

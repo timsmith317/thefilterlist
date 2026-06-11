@@ -283,7 +283,9 @@ function makeStyles(t) {
     chev: { fontSize: 20, lineHeight: 22, color: t.muted },
     nameRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
     iconLabel: { paddingLeft: 0, textAlign: 'center' },
-    iconBox: { width: 50, height: 50, borderRadius: 10, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.line, alignItems: 'center', justifyContent: 'center' },
+    // Icon box border matches the index-page icon chips (t.iconBorder +
+    // t.radius.chip), not the lighter t.line of the text fields beside it.
+    iconBox: { width: 50, height: 50, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
     filtersBox: { marginTop: 10, backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
     filterRow: { paddingVertical: 12 },
     filterRowDivider: { borderTopWidth: 1, borderTopColor: t.line },

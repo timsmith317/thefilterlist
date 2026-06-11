@@ -29,10 +29,11 @@ import { useTheme } from '../../theme/theme';
 import { PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
 import PhotoCropper from '../../components/PhotoCropper';
+import CameraCaptureModal from '../../components/CameraCaptureModal';
 import IntervalField from '../../components/IntervalField';
 import { loadData, saveData, addFilter, FILTER_TYPES, MAX_FILTER_PHOTOS } from '../../data/store';
 import { intervalToDays } from '../../lib/interval';
-import { pickFromLibrary, takePhoto, saveToPhotos, deleteFile } from '../../lib/filterPhotos';
+import { pickFromLibrary, saveToPhotos, deleteFile } from '../../lib/filterPhotos';
 import { setPendingPick } from '../../lib/pendingPick';
 
 export default function NewFilter() {
@@ -50,6 +51,7 @@ export default function NewFilter() {
   const [lowStockThreshold, setLowStockThreshold] = useState('1');
   const [photos, setPhotos] = useState([]);
   const [cropAsset, setCropAsset] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   useEffect(() => { loadData().then(setData); }, []);
   const s = makeStyles(t);
@@ -102,7 +104,8 @@ export default function NewFilter() {
       Alert.alert('Limit reached', `Up to ${MAX_FILTER_PHOTOS} photos.`);
       return;
     }
-    const asset = source === 'camera' ? await takePhoto() : await pickFromLibrary();
+    if (source === 'camera') { setCameraOpen(true); return; }
+    const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
   };
@@ -173,7 +176,7 @@ export default function NewFilter() {
         <Text style={s.hint}>You'll get a low-stock alert when on-hand reaches this number.</Text>
 
         <Text style={s.label}>PHOTOS</Text>
-        <View style={{ paddingLeft: 13 }}>
+        <View>
           <PhotoStrip
             photos={photos}
             max={MAX_FILTER_PHOTOS}
@@ -195,6 +198,12 @@ export default function NewFilter() {
           if (uri) setPhotos(prev => [...prev, uri].slice(0, MAX_FILTER_PHOTOS));
           setCropAsset(null);
         }}
+      />
+
+      <CameraCaptureModal
+        visible={cameraOpen}
+        onCancel={() => setCameraOpen(false)}
+        onCapture={(asset) => { setCameraOpen(false); setCropAsset(asset); }}
       />
     </SafeAreaView>
   );
