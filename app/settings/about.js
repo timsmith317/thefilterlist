@@ -1,6 +1,6 @@
 // app/settings/about.js
 //
-// About screen + hidden easter egg: tap the LogoMark 4 times within ~1.5s
+// About screen + hidden easter egg: tap the logo 4 times within ~1.5s
 // of each other and you'll get a three-phase visual effect:
 //
 //   Phase 1 — Fizzle  (0–900ms):   500 grey particles pop into existence
@@ -28,7 +28,6 @@
 // The logo itself reacts: contracts at vacuum start (anticipation,
 // "inhale"), expands as particles arrive (absorbing), settles back. A
 // brief haptic fires on trigger.
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Linking, Alert, Modal,
@@ -39,12 +38,10 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
-import { LogoMark } from '../../theme/Icons';
-
+import BrandMark from '../../components/BrandMark';
 const VERSION = Constants.expoConfig?.version || '1.0.0';
 const PRIVACY_URL = 'https://thefilterlist.app/privacy';
 const SUPPORT_URL = 'https://thefilterlist.app';
-
 // Easter egg config — tweak any of these to taste.
 const TAP_THRESHOLD            = 4;
 const TAP_RESET_MS             = 1500;
@@ -62,11 +59,9 @@ const PARTICLE_MIN_OPACITY     = 0.5;
 const PARTICLE_MAX_OPACITY     = 0.95;
 const SWIRL_MAX_FACTOR         = 0.4;    // ±40% perpendicular curve offset
 const BEZIER_STEPS             = 14;     // path resolution; 12-16 is smooth
-
 // Approximate logo center on screen — safe area top + head row + body
 // margin + half of the logo box ≈ 150 on every supported iPhone.
 const LOGO_TARGET_Y = 150;
-
 // ----- Particle -----
 //
 // Lives through three phases:
@@ -93,7 +88,6 @@ function Particle({
   const progress = useRef(new Animated.Value(0)).current;
   const op = useRef(new Animated.Value(0)).current;
   const sc = useRef(new Animated.Value(0)).current;
-
   // Precompute the Bezier path. useMemo locks it once on mount.
   const { txRange, tyRange, inputRange } = useMemo(() => {
     const dx = targetX - startX;
@@ -105,7 +99,6 @@ function Particle({
     const offset = swirlFactor * dist;
     const controlX = (startX + targetX) / 2 + perpX * offset;
     const controlY = (startY + targetY) / 2 + perpY * offset;
-
     const input = [];
     const xs = [];
     const ys = [];
@@ -121,10 +114,8 @@ function Particle({
     }
     return { txRange: xs, tyRange: ys, inputRange: input };
   }, []);
-
   const tx = progress.interpolate({ inputRange, outputRange: txRange });
   const ty = progress.interpolate({ inputRange, outputRange: tyRange });
-
   useEffect(() => {
     // Phase 1: Fizzle in (fade + scale with slight overshoot).
     Animated.parallel([
@@ -142,7 +133,6 @@ function Particle({
         useNativeDriver: true,
       }),
     ]).start();
-
     // Phase 3: Vacuum — staggered per particle so they arrive in waves.
     const vacuumTimer = setTimeout(() => {
       Animated.parallel([
@@ -169,10 +159,8 @@ function Particle({
         ]),
       ]).start();
     }, VACUUM_START_MS + vacuumDelay);
-
     return () => clearTimeout(vacuumTimer);
   }, []);
-
   return (
     <Animated.View
       pointerEvents="none"
@@ -188,26 +176,21 @@ function Particle({
     />
   );
 }
-
 export default function AboutSettings() {
   const t = useTheme();
   const router = useRouter();
   const s = makeStyles(t);
-
   // Easter egg state
   const tapCount = useRef(0);
   const tapResetTimer = useRef(null);
   const isAnimating = useRef(false);
   const [particles, setParticles] = useState([]);
   const logoScale = useRef(new Animated.Value(1)).current;
-
   const onLogoTap = () => {
     if (isAnimating.current) return;
-
     tapCount.current += 1;
     if (tapResetTimer.current) clearTimeout(tapResetTimer.current);
     tapResetTimer.current = setTimeout(() => { tapCount.current = 0; }, TAP_RESET_MS);
-
     if (tapCount.current >= TAP_THRESHOLD) {
       tapCount.current = 0;
       clearTimeout(tapResetTimer.current);
@@ -215,15 +198,12 @@ export default function AboutSettings() {
       triggerEasterEgg();
     }
   };
-
   const triggerEasterEgg = () => {
     isAnimating.current = true;
     Vibration.vibrate(); // brief tactile feedback at trigger
-
     const dims = Dimensions.get('window');
     const targetX = dims.width / 2;
     const targetY = LOGO_TARGET_Y;
-
     // Generate dust distributed across the full screen with varied tone,
     // size, opacity, swirl direction/magnitude, and arrival timing — so
     // every particle has its own unique path into the logo.
@@ -242,7 +222,6 @@ export default function AboutSettings() {
       targetY,
     }));
     setParticles(newParticles);
-
     // Logo choreography: contract just before vacuum, expand as
     // particles arrive, settle back.
     Animated.sequence([
@@ -266,13 +245,11 @@ export default function AboutSettings() {
         useNativeDriver: true,
       }),
     ]).start();
-
     // Cleanup — wait for the latest particle (max vacuum delay) to finish
     const cleanupMs = VACUUM_START_MS + VACUUM_MAX_DELAY_MS + VACUUM_DURATION_MS + 200;
     setTimeout(() => setParticles([]), cleanupMs);
     setTimeout(() => { isAnimating.current = false; }, COOLDOWN_MS);
   };
-
   const openURL = async (url) => {
     try {
       const ok = await Linking.canOpenURL(url);
@@ -282,33 +259,28 @@ export default function AboutSettings() {
       Alert.alert('Cannot open', String(e?.message || url));
     }
   };
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <BackButton onPress={() => router.back()} />
         <View />
       </View>
-
       <View style={s.body}>
         <View style={s.brandBlock}>
           <Pressable onPress={onLogoTap} hitSlop={4}>
             <Animated.View
               style={[s.logoBox, { transform: [{ scale: logoScale }] }]}
             >
-              <LogoMark size={56} />
+              <BrandMark size={54} />
             </Animated.View>
           </Pressable>
           <Text style={s.appName}>The Filter List</Text>
           <Text style={s.version}>Version {VERSION}</Text>
         </View>
-
         <Text style={s.tagline}>
           Track every device across your Home, Auto, and Work.
         </Text>
-
         <View style={s.spacer} />
-
         <Text style={s.label}>LINKS</Text>
         <View>
           <Pressable
@@ -326,10 +298,8 @@ export default function AboutSettings() {
             <Text style={s.linkChev}>{'\u203A'}</Text>
           </Pressable>
         </View>
-
         <Text style={s.footer}>© 2026 The Filter List</Text>
       </View>
-
       {/* Particles overlay in a Modal — guaranteed full-screen,
           window-relative coordinate space. */}
       <Modal
@@ -360,7 +330,6 @@ export default function AboutSettings() {
     </SafeAreaView>
   );
 }
-
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
@@ -368,9 +337,7 @@ function makeStyles(t) {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
-
     body: { flex: 1, paddingHorizontal: 18, paddingBottom: 24 },
-
     brandBlock: { alignItems: 'center', marginTop: 16, marginBottom: 10 },
     logoBox: {
       width: 80, height: 80,
@@ -385,19 +352,15 @@ function makeStyles(t) {
       color: t.brand || t.ink,
     },
     version: { fontSize: 13, color: t.muted, marginTop: 4 },
-
     tagline: {
       fontSize: 15, color: t.inkSoft, textAlign: 'center', lineHeight: 21,
       paddingHorizontal: 12, marginTop: 8,
     },
-
     spacer: { flex: 1, minHeight: 20 },
-
     label: {
       ...t.type.kicker, color: t.muted, textTransform: 'uppercase',
       marginTop: 8, marginBottom: 8, paddingLeft: 13,
     },
-
     linkRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 16, paddingVertical: 14,
@@ -408,7 +371,6 @@ function makeStyles(t) {
     linkRowPressed: { backgroundColor: t.tabIdleBg },
     linkTxt: { fontSize: 15, fontWeight: '600', color: t.ink },
     linkChev: { fontSize: 22, color: t.muted },
-
     footer: {
       fontSize: 12, color: t.muted, textAlign: 'center', marginTop: 16,
     },

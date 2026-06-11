@@ -17,10 +17,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Modal, ScrollView, useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/theme';
+import BrandMark from './BrandMark';
 
 const ONBOARDED_KEY = 'thefilterlist.onboarded.v1';
 
@@ -33,7 +34,7 @@ export function replayOnboarding() { if (_opener) _opener(); }
 
 const SLIDES = [
   {
-    icon: 'square.stack.3d.up.fill',
+    brand: true,
     title: 'Welcome to The Filter List',
     body: 'Keep track of every filter across your home, car, and workplace — and always know what\u2019s due next.',
   },
@@ -57,6 +58,7 @@ const SLIDES = [
 export default function OnboardingModal() {
   const t = useTheme();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [page, setPage] = useState(0);
   const scrollRef = useRef(null);
@@ -108,7 +110,7 @@ export default function OnboardingModal() {
       onRequestClose={finish}
       onShow={() => scrollRef.current?.scrollTo({ x: 0, animated: false })}
     >
-      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <View style={[s.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={s.topBar}>
           <Pressable onPress={finish} hitSlop={12}>
             <Text style={s.skip}>Skip</Text>
@@ -126,7 +128,9 @@ export default function OnboardingModal() {
           {SLIDES.map((sl, i) => (
             <View key={i} style={[s.slide, { width }]}>
               <View style={s.iconWrap}>
-                <SymbolView name={sl.icon} size={62} tintColor={t.brand} resizeMode="scaleAspectFit" />
+                {sl.brand
+                  ? <BrandMark size={62} />
+                  : <SymbolView name={sl.icon} size={62} tintColor={t.brand} resizeMode="scaleAspectFit" />}
               </View>
               <Text style={s.slideTitle}>{sl.title}</Text>
               <Text style={s.slideBody}>{sl.body}</Text>
@@ -145,7 +149,7 @@ export default function OnboardingModal() {
             <Text style={s.ctaTxt}>{last ? 'Get Started' : 'Next'}</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -157,9 +161,9 @@ function makeStyles(t) {
 
     topBar: {
       flexDirection: 'row', justifyContent: 'flex-end',
-      paddingHorizontal: 20, paddingTop: 8, minHeight: 28,
+      paddingHorizontal: 20, paddingTop: 12, minHeight: 28,
     },
-    skip: { fontSize: 15, fontWeight: '600', color: t.muted },
+    skip: { fontSize: 17, fontWeight: '600', color: t.muted },
 
     slide: {
       flex: 1, alignItems: 'center', justifyContent: 'center',
@@ -189,7 +193,7 @@ function makeStyles(t) {
     },
     dotActive: { backgroundColor: t.brand, width: 22 },
 
-    footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 4 },
+    footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8 },
     cta: {
       paddingVertical: 15, borderRadius: 12, backgroundColor: t.tabIdleBg,
       alignItems: 'center', justifyContent: 'center', minHeight: 52,

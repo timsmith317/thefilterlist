@@ -13,7 +13,6 @@
 const LOCKUP_NUDGE = -8;
 const WORDMARK_COLOR = '#15803d'; // soft sage green
 const PILL_NUDGE = -4;            // status-pill vertical nudge; negative = up
-
 // Card internal padding — the inset from the card edge to its inner
 // content (icon left, pill right). Title row, sub-text, and tabs row
 // all align to (body padding + CARD_PADDING) so that "Due Soon", the
@@ -22,13 +21,13 @@ const PILL_NUDGE = -4;            // status-pill vertical nudge; negative = up
 // Change CARD_PADDING in one place and everything tracks.
 const CARD_PADDING = 14;
 // =================================================================
-
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
-import { LogoMark, DeviceIcon, IconGear } from '../theme/Icons';
+import { DeviceIcon, IconGear } from '../theme/Icons';
+import BrandMark from '../components/BrandMark';
 import Wordmark from '../theme/Wordmark';
 import {
   loadData, dueSoonList, devicesForAssetId, assetsList, dueCount,
@@ -59,10 +58,9 @@ export default function DueSoon() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={[s.brandRow, { transform: [{ translateX: LOCKUP_NUDGE }] }]}>
-        <View style={s.logoBox}><LogoMark size={44} color={t.ink} /></View>
+        <View style={s.logoBox}><BrandMark size={32} /></View>
         <Wordmark color={WORDMARK_COLOR} size={26} />
       </View>
-
       <View style={s.titleRow}>
         <Text style={s.title}>Due Soon</Text>
         <View style={s.settingsWrap}>
@@ -75,7 +73,6 @@ export default function DueSoon() {
       <Text style={s.sub}>
         {due === 0 ? "Everything's fresh." : `${due} device${due > 1 ? 's' : ''} need${due > 1 ? '' : 's'} attention`}
       </Text>
-
       {/* Tabs use space-between with flexGrow: 1 so the "All" pill sits at
           the left inset and the last category pill sits at the right
           inset (matching the icon and status-pill alignment lines of
@@ -91,7 +88,6 @@ export default function DueSoon() {
           );
         })}
       </ScrollView>
-
       <ScrollView style={s.list} contentContainerStyle={s.listContent}>
         {list.length === 0 && <Text style={s.empty}>No devices here yet.</Text>}
         {list.map(f => {
@@ -145,12 +141,10 @@ function makeStyles(t) {
   // status pill right). Used to align the title row, sub-text, and tabs
   // row with the card content below.
   const CONTENT_INSET = t.space.lg + CARD_PADDING; // 16 + 14 = 30
-
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
     brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: t.space.lg, paddingBottom: t.space.sm, paddingHorizontal: t.space.lg },
     logoBox: { width: LOGO_SIZE, height: LOGO_SIZE, borderRadius: t.radius.chip, backgroundColor: t.bg, borderWidth: 2, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
-
     // Aligned to CONTENT_INSET on both sides so "Due Soon" sits over the
     // icon-left line and the Settings pill's right edge sits over the
     // status-pill-right line.
@@ -162,7 +156,6 @@ function makeStyles(t) {
     // Bold + full black to match the app's pill labels (Edit, Save, Done, etc.).
     settingsTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
     sub: { fontSize: 13, color: t.muted, paddingHorizontal: CONTENT_INSET, paddingBottom: 4 },
-
     tabsWrap: { flexGrow: 0 },
     // flexGrow: 1 stretches the content container to at least the
     // ScrollView width, so justifyContent: 'space-between' actually
@@ -184,22 +177,18 @@ function makeStyles(t) {
     tabOn: { backgroundColor: t.tabIdleBg },
     tabTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
     tabTxtOn: { color: t.ink, fontWeight: '700' },
-
     list: { flex: 1 },
     listContent: { paddingHorizontal: t.space.lg, paddingTop: t.space.md, gap: 11 },
     empty: { padding: 24, textAlign: 'center', color: t.muted, fontStyle: 'italic' },
-
     // alignItems: flex-start so the icon chip and the title/pill row both align
     // to the TOP of the card. padding uses CARD_PADDING so the title/sub/tabs
     // alignment math above stays in sync if this ever changes.
     card: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, padding: CARD_PADDING, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: t.radius.card },
     iconChip: { width: 44, height: 44, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
-
     // Title + status pill on one row, top-aligned. Title takes the remaining
     // width and truncates; pill hugs the right edge.
     topRow: { flexDirection: 'row', alignItems: 'flex-start' },
     cardName: { ...t.type.body, color: t.ink, flex: 1, marginRight: 10 },
-
     // Meta line: asset (+ interval for single-stage) takes the row and
     // truncates; the "N stages" badge, when present, is pinned to the right
     // edge so it sits directly under the status pill.
@@ -207,7 +196,6 @@ function makeStyles(t) {
     cardMeta: { ...t.type.meta, color: t.muted, flex: 1, marginRight: 8 },
     stagesBadge: { backgroundColor: t.tabIdleBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
     stagesBadgeTxt: { fontSize: 11, fontWeight: '700', color: t.inkSoft },
-
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },
   });
