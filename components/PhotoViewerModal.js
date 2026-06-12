@@ -4,6 +4,8 @@
 // iOS SHEET (presentationStyle="pageSheet") the icon/manual pickers use, with the
 // app's white/themed background, so it reads as an integrated modal rather than a
 // dark overlay. The photo sits in a centered, themed FRAME (a card) in the middle.
+//   - Always opens on the photo that was TAPPED (the `index` prop), regardless
+//     of where a previous viewing session left the carousel.
 //   - Swipe left/right to move through the filter's photos (a horizontal paging
 //     ScrollView; one square page per photo).
 //   - Pinch to zoom / pan within the current photo. Each page is itself a
@@ -34,17 +36,22 @@ export default function PhotoViewerModal({ visible, photos = [], index = 0, onCl
   // Reset to the requested start index whenever the viewer (re)opens.
   useEffect(() => {
     if (visible) setCur(index);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, index]);
 
-  // Jump the pager to the current page (no animation) once we know the frame
-  // size, or when the viewer opens.
+  // Snap the pager to the REQUESTED photo when the viewer opens (and once the
+  // frame size is known).
+  //
+  // This must scroll to `index`, NOT `cur`. Both effects run in the same pass
+  // when the viewer opens, so reading `cur` here would see the PREVIOUS
+  // session's page (the reset above hasn't applied yet) — which was the
+  // "always reopens on the last photo I swiped to" bug. `index` is the source
+  // of truth for "what was tapped," and it only changes while the viewer is
+  // closed, so this never fights an in-progress swipe.
   useEffect(() => {
-    if (side > 0 && visible && pagerRef.current) {
-      pagerRef.current.scrollTo({ x: cur * side, y: 0, animated: false });
+    if (visible && side > 0 && pagerRef.current) {
+      pagerRef.current.scrollTo({ x: index * side, y: 0, animated: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [side, visible]);
+  }, [visible, side, index]);
 
   const onMomentumEnd = (e) => {
     if (!side) return;
@@ -82,6 +89,12 @@ export default function PhotoViewerModal({ visible, photos = [], index = 0, onCl
                   ref={pagerRef}
                   horizontal
                   pagingEnabled
+                  // Initial offset for a fresh mount: RN's Modal unmounts its
+                  // children while hidden, so the pager remounts on every open
+                  // at offset 0. This puts it on the tapped photo from the
+                  // first frame — covering the window where an imperative
+                  // scrollTo could land before the native view has measured.
+                  contentOffset={{ x: index * side, y: 0 }}
                   showsHorizontalScrollIndicator={false}
                   onMomentumScrollEnd={onMomentumEnd}
                 >
