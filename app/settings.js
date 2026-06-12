@@ -8,6 +8,8 @@
 //
 // Cards link via `route`. If a row is ever added without a route, it
 // renders without a chevron and shows a "coming soon" alert on tap.
+// Appearance opens as a modal (declared in _layout.js) but rows here
+// don't need to know that — router.push handles both.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
@@ -22,16 +24,17 @@ export default function Settings() {
   const s = makeStyles(t);
 
   // Row order is usage-based: Devices → Filters → Assets → Reminders → Backup →
-  // Help → About. Every row is a bordered chevron card. (Categories were removed —
-  // assets are now the single organizing dimension.)
+  // Appearance → Help → About. Every row is a bordered chevron card.
+  // (Categories were removed — assets are now the single organizing dimension.)
   const rows = [
-    { k: 'devices',   label: 'Devices',          desc: 'Add, edit, and schedule devices',  route: '/settings/devices' },
-    { k: 'filters',     label: 'Filters',             desc: 'Track on-hand stock and reorders', route: '/settings/filters' },
-    { k: 'assets',    label: 'Assets & Archive', desc: 'Manage and reorder your assets',    route: '/settings/assets' },
-    { k: 'reminders', label: 'Reminders',        desc: 'Push notifications, lead time',     route: '/settings/reminders' },
-    { k: 'backup',    label: 'Backup & Restore', desc: 'Export / import your data',         route: '/settings/backup' },
-    { k: 'help',      label: 'Help & Tips',      desc: 'How the app works',                 route: '/settings/help' },
-    { k: 'about',     label: 'About',            desc: 'Version, credits, and licenses',    route: '/settings/about' },
+    { k: 'devices',    label: 'Devices',          desc: 'Add, edit, and schedule devices',  route: '/settings/devices' },
+    { k: 'filters',    label: 'Filters',          desc: 'Track on-hand stock and reorders', route: '/settings/filters' },
+    { k: 'assets',     label: 'Assets & Archive', desc: 'Manage and reorder your assets',   route: '/settings/assets' },
+    { k: 'reminders',  label: 'Reminders',        desc: 'Push notifications, lead time',    route: '/settings/reminders' },
+    { k: 'backup',     label: 'Backup & Restore', desc: 'Export / import your data',        route: '/settings/backup' },
+    { k: 'appearance', label: 'Appearance',       desc: 'System, light, or dark theme',     route: '/settings/appearance' },
+    { k: 'help',       label: 'Help & Tips',      desc: 'How the app works',                route: '/settings/help' },
+    { k: 'about',      label: 'About',            desc: 'Version, credits, and licenses',   route: '/settings/about' },
   ];
 
   const onPress = (row) => {

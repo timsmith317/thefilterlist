@@ -1,10 +1,65 @@
 // theme.js — single source of truth for The Filter List's look.
-// Theme-aware: light + dark palettes, switched by the system color scheme.
+// Theme-aware: light + dark palettes, switched by the system color scheme
+// OR by an explicit user choice (Settings → Appearance).
 // Every screen pulls from useTheme(); nothing hardcodes a color.
 // Font is the system font for now (clean, zero-setup); swap to Inter later
 // by changing `fontFamily` here only.
 
-import { useColorScheme } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useColorScheme, Appearance } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ----- Theme mode (user override) -----
+// 'system' = follow the OS (default), 'light' / 'dark' = forced.
+// We lean on Appearance.setColorScheme(): it overrides what useColorScheme()
+// returns app-wide, so useTheme() below — and every screen — picks up the
+// forced mode with zero per-screen changes. Passing null restores "follow
+// the system." The choice persists in its own AsyncStorage key, separate
+// from the data store (thefilterlist.data.v5 untouched).
+const MODE_KEY = 'thefilterlist.themeMode.v1';
+const VALID_MODES = ['system', 'light', 'dark'];
+
+// Module-level cache so useThemeMode() can initialize synchronously after
+// the launch read completes (it resolves within milliseconds of startup,
+// long before Settings can be opened).
+let cachedMode = 'system';
+
+// Apply the saved override at app launch. theme.js is imported by every
+// screen, so this top-level read runs once when the bundle loads. There is
+// a sub-second window on cold launch where the system theme shows before
+// the override lands — accepted tradeoff, not worth gating the splash on.
+AsyncStorage.getItem(MODE_KEY)
+  .then((v) => {
+    if (VALID_MODES.includes(v)) {
+      cachedMode = v;
+      if (v !== 'system') Appearance.setColorScheme(v);
+    }
+  })
+  .catch(() => {});
+
+// Hook for the Settings toggle: const [mode, setMode] = useThemeMode();
+// setMode('light' | 'dark' | 'system') applies instantly and persists.
+export function useThemeMode() {
+  const [mode, setModeState] = useState(cachedMode);
+
+  // Belt-and-suspenders re-sync in case this mounts before the launch
+  // read resolved (effectively never in practice).
+  useEffect(() => {
+    AsyncStorage.getItem(MODE_KEY)
+      .then((v) => { if (VALID_MODES.includes(v)) setModeState(v); })
+      .catch(() => {});
+  }, []);
+
+  const setMode = (next) => {
+    if (!VALID_MODES.includes(next)) return;
+    cachedMode = next;
+    setModeState(next);
+    Appearance.setColorScheme(next === 'system' ? null : next);
+    AsyncStorage.setItem(MODE_KEY, next).catch(() => {});
+  };
+
+  return [mode, setMode];
+}
 
 // ----- Status tones (urgency) for both themes -----
 const STATUS = {
