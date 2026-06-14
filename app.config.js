@@ -63,6 +63,7 @@ export default {
       'expo-file-system',
       'expo-sharing',
       'expo-font',
+      './plugins/withCustomAppIcon',
     ],
     experiments: {
       typedRoutes: true,
