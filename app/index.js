@@ -3,16 +3,25 @@
 // Config constants (tweak these):
 //   LOCKUP_NUDGE: horizontal nudge (px) for the brand lockup (logo +
 //     wordmark) to keep it optically centered.
-//   WORDMARK_COLOR: the color of "The Filter List" text.
-//     Forest green '#15803d' to match logo, near-black '#0f172a' for neutral,
-//     or sage greens like '#7c9885' for softer tone.
+//   WORDMARK_COLOR: color of "The Filter List" text. Leave null to use the
+//     theme's text color, which adapts to light AND dark mode (recommended).
+//     A fixed hex (e.g. '#0f172a') reads great in one mode but can vanish in
+//     the other, so only hardcode if you don't support both appearances.
 //   PILL_NUDGE: vertical nudge (px) for the status pill on each card. It's the
 //     marginTop on the pill: 0 sits it at the top of the title row, NEGATIVE
 //     moves it UP, positive moves it down. Tune to taste.
 //
 const LOCKUP_NUDGE = -8;
-const WORDMARK_COLOR = '#15803d'; // soft sage green
+const WORDMARK_COLOR = null;      // null = theme text color (adapts light/dark)
+const WORDMARK_SIZE = 18;        // brand wordmark size — small = masthead, lets "Due Soon" lead
 const PILL_NUDGE = -4;            // status-pill vertical nudge; negative = up
+// Header app icon + its framing ring. LOGO_SIZE is the icon size; the
+// border constants control the light ring around it. Set WIDTH to 0 to
+// remove the ring. COLOR null falls back to the theme's light border.
+const LOGO_SIZE         = 32;
+const LOGO_BORDER_COLOR = '#14532D';   // e.g. '#d7dce1'; null = theme iconBorder
+const LOGO_BORDER_WIDTH = 0;      // ring thickness in px (0 = no ring)
+const LOGO_BORDER_GAP   = 1;      // gap between the ring and the icon (px)
 // Card internal padding — the inset from the card edge to its inner
 // content (icon left, pill right). Title row, sub-text, and tabs row
 // all align to (body padding + CARD_PADDING) so that "Due Soon", the
@@ -34,7 +43,6 @@ import {
 } from '../data/store';
 import { formatInterval } from '../lib/interval';
 
-const LOGO_SIZE = 50;
 
 export default function DueSoon() {
   const t = useTheme();
@@ -58,8 +66,8 @@ export default function DueSoon() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={[s.brandRow, { transform: [{ translateX: LOCKUP_NUDGE }] }]}>
-        <View style={s.logoBox}><BrandMark size={32} /></View>
-        <Wordmark color={WORDMARK_COLOR} size={26} />
+        <View style={s.logoBorder}><BrandMark size={LOGO_SIZE} /></View>
+        <Wordmark color={WORDMARK_COLOR || t.ink} size={WORDMARK_SIZE} />
       </View>
       <View style={s.titleRow}>
         <Text style={s.title}>Due Soon</Text>
@@ -144,7 +152,15 @@ function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
     brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: t.space.lg, paddingBottom: t.space.sm, paddingHorizontal: t.space.lg },
-    logoBox: { width: LOGO_SIZE, height: LOGO_SIZE, borderRadius: t.radius.chip, backgroundColor: t.bg, borderWidth: 2, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
+    // Ring around the header app icon. Tune via the LOGO_BORDER_* constants
+    // at the top of the file; borderRadius is derived to stay concentric
+    // with the icon's own corners (icon radius = LOGO_SIZE * 0.225).
+    logoBorder: {
+      padding: LOGO_BORDER_GAP,
+      borderWidth: LOGO_BORDER_WIDTH,
+      borderColor: LOGO_BORDER_COLOR || t.iconBorder,
+      borderRadius: LOGO_SIZE * 0.225 + LOGO_BORDER_GAP + LOGO_BORDER_WIDTH,
+    },
     // Aligned to CONTENT_INSET on both sides so "Due Soon" sits over the
     // icon-left line and the Settings pill's right edge sits over the
     // status-pill-right line.

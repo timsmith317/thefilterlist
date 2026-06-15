@@ -269,9 +269,9 @@ export default function AboutSettings() {
         <View style={s.brandBlock}>
           <Pressable onPress={onLogoTap} hitSlop={4}>
             <Animated.View
-              style={[s.logoBox, { transform: [{ scale: logoScale }] }]}
+              style={[s.logoWrap, { transform: [{ scale: logoScale }] }]}
             >
-              <BrandMark size={54} />
+              <BrandMark size={80} />
             </Animated.View>
           </Pressable>
           <Text style={s.appName}>The Filter List</Text>
@@ -339,11 +339,7 @@ function makeStyles(t) {
     },
     body: { flex: 1, paddingHorizontal: 18, paddingBottom: 24 },
     brandBlock: { alignItems: 'center', marginTop: 16, marginBottom: 10 },
-    logoBox: {
-      width: 80, height: 80,
-      borderRadius: 16,
-      borderWidth: 1.5, borderColor: t.iconBorder,
-      backgroundColor: t.bg,
+    logoWrap: {
       alignItems: 'center', justifyContent: 'center',
       marginBottom: 14,
     },

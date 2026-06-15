@@ -25,6 +25,9 @@ import BrandMark from './BrandMark';
 
 const ONBOARDED_KEY = 'thefilterlist.onboarded.v1';
 
+// Welcome-tour icon glyph color — the emerald from the app icon.
+const ICON_GLYPH = '#10B981'; // emerald — matches the icon fill
+
 // Imperative replay trigger. The mounted modal registers its opener here, so any
 // screen (e.g. Help & Tips) can call replayOnboarding() to re-show the intro —
 // no props or navigation needed. A React Native <Modal> presents above the whole
@@ -127,11 +130,13 @@ export default function OnboardingModal() {
         >
           {SLIDES.map((sl, i) => (
             <View key={i} style={[s.slide, { width }]}>
-              <View style={s.iconWrap}>
-                {sl.brand
-                  ? <BrandMark size={62} />
-                  : <SymbolView name={sl.icon} size={62} tintColor={t.brand} resizeMode="scaleAspectFit" />}
-              </View>
+              {sl.brand ? (
+                <View style={s.brandWrap}><BrandMark size={96} /></View>
+              ) : (
+                <View style={s.iconWrap}>
+                  <SymbolView name={sl.icon} size={62} tintColor={ICON_GLYPH} resizeMode="scaleAspectFit" />
+                </View>
+              )}
               <Text style={s.slideTitle}>{sl.title}</Text>
               <Text style={s.slideBody}>{sl.body}</Text>
             </View>
@@ -173,6 +178,11 @@ function makeStyles(t) {
       width: 112, height: 112, borderRadius: 28,
       alignItems: 'center', justifyContent: 'center',
       borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
+      marginBottom: 32,
+    },
+    brandWrap: {
+      width: 112, height: 112,
+      alignItems: 'center', justifyContent: 'center',
       marginBottom: 32,
     },
     slideTitle: {
