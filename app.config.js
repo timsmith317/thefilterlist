@@ -44,33 +44,6 @@ export default {
           'The Filter List can attach photos from your library as part references.',
         NSPhotoLibraryAddUsageDescription:
           'The Filter List can save reference photos to your Photos library.',
-
-        // --- Custom ".filter" backup document type ---
-        // Declares the app as the owner/handler of .filter files: gives them a
-        // real type name, branded icon, and clean "Open in The Filter List" /
-        // AirDrop routing instead of a generic document.
-        CFBundleDocumentTypes: [
-          {
-            CFBundleTypeName: 'Filter List Backup',
-            LSHandlerRank: 'Owner',
-            LSItemContentTypes: ['app.thefilterlist.backup'],
-            CFBundleTypeIconFiles: ['FilterDoc'],
-          },
-        ],
-        UTExportedTypeDeclarations: [
-          {
-            UTTypeIdentifier: 'app.thefilterlist.backup',
-            UTTypeDescription: 'Filter List Backup',
-            // Backups are JSON, so conform to public.json (which is also
-            // public.data). Quick Look can then text-preview them. If you'd
-            // rather suppress preview of the large file, use ['public.data'].
-            UTTypeConformsTo: ['public.json'],
-            UTTypeTagSpecification: {
-              'public.filename-extension': ['filter'],
-              'public.mime-type': ['application/json'],
-            },
-          },
-        ],
       },
     },
     android: {
@@ -83,7 +56,6 @@ export default {
       },
     },
     plugins: [
-      './plugins/withFilterDocumentType',
       'expo-router',
       'expo-notifications',
       'expo-image-picker',
