@@ -7,8 +7,12 @@
 // MULTI-STAGE devices render a STAGES section instead: the data card carries
 // Location / Type / Stages / Next due (soonest), then one card per stage —
 // each with its own status pill, linked filter (SKU / on-hand / low-stock),
-// its own interval + next-due, and tap-through to the filter. Mark Replaced
-// opens the per-stage sheet (check what you swapped, pick a date).
+// its own interval + next-due + last-replaced, and tap-through to the filter.
+// Mark Replaced opens the per-stage sheet (check what you swapped, pick a date).
+//
+// (Single-stage already shows Last replaced in the summary data card; multi-stage
+// stages surface it per StageCard, so both layouts show it and match the Edit
+// screen's per-filter last-replaced line.)
 //
 // Intervals display in human units (1y / 6m / 30d) via lib/interval.
 //
@@ -294,6 +298,12 @@ function StageCard({ t, s, stage, index, filter, fmt, onPress }) {
       </View>
       {filter && !!filter.sku && <Text style={s.filterMeta}>SKU: {filter.sku}</Text>}
       <Text style={s.stageSched}>Every {formatInterval(stage.intervalDays)} · Next {fmt(stage.status.due)}</Text>
+      {/* Last replaced — parallels the single-stage summary card and the Edit
+          screen's per-filter line, so this stage's recorded date is visible
+          here too. Sits between the schedule and on-hand lines. */}
+      {filter && (
+        <Text style={s.stageReplaced}>Last replaced: {stage.lastReplaced ? fmt(stage.lastReplaced) : '—'}</Text>
+      )}
       {filter
         ? <Text style={s.stageStock}>On hand: {filter.onHand}</Text>
         : <Text style={s.noFilter}>No filter linked</Text>}
@@ -381,6 +391,8 @@ function makeStyles(t) {
     stageCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14, marginBottom: 10, marginHorizontal: 16 },
     stageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
     stageSched: { fontSize: 12.5, color: t.inkSoft, fontWeight: '600', marginTop: 6 },
+    // Last-replaced line — muted, sits between schedule and on-hand.
+    stageReplaced: { fontSize: 12.5, color: t.muted, fontWeight: '500', marginTop: 5 },
     stageStock: { fontSize: 12.5, color: t.muted, fontWeight: '500', marginTop: 5 },
     noFilter: { fontSize: 12.5, color: t.muted, fontStyle: 'italic', marginTop: 6 },
 

@@ -7,9 +7,25 @@
 // device-level interval. A device with NO filters simply has no schedule; to
 // track something by hand, use the Notes field.
 //
+// LAST REPLACED (onboarding):
+//   Each attached filter row is tappable and opens the same DatePickerModal that
+//   Mark Replaced uses, letting you set WHEN that filter was last replaced. This
+//   is the natural home for onboarding existing equipment with past dates —
+//   Mark Replaced on the Detail screen stays the one-tap "I just swapped it now"
+//   action; this is the "set the real history" action. Each row shows a
+//   "Last replaced: …" line so you can see exactly what the app has recorded
+//   (or "Not set" — which is the case the store would otherwise silently stamp
+//   as today on save, the exact thing that felt unintuitive).
+//
+//   The date is a per-STAGE fact, not a filter fact: the same filter used by two
+//   devices has its own last-replaced date on each. So this lives here (the
+//   device editor, where a row == a stage), NOT on the shared Filter screen.
+//   The picked date is written into draft.preserved[filterId].lastReplaced,
+//   which save() already round-trips into the stage.
+//
 // Each existing filter keeps its stage id + lastReplaced (history preserved);
-// newly-attached filters start fresh (the store stamps lastReplaced on save).
-// Removing every filter saves an empty stages array (no schedule).
+// newly-attached filters start fresh (the store stamps lastReplaced on save
+// unless we set one here). Removing every filter saves an empty stages array.
 //
 // Asset is selected via the single-select /picker route. Picks come back via
 // lib/pendingPick on focus:
@@ -30,6 +46,7 @@ import { useTheme } from '../../../theme/theme';
 import { PillButton } from '../../../components/HeaderBits';
 import ManualPickerModal from '../../../components/ManualPickerModal';
 import IconPickerModal from '../../../components/IconPickerModal';
+import DatePickerModal from '../../../components/DatePickerModal';
 import { DeviceIcon } from '../../../theme/Icons';
 import { loadData, saveData, updateDevice, deleteDevice, filtersList, deviceStages, deviceDisplayType, DEFAULT_INTERVAL_DAYS } from '../../../data/store';
 import { persistManualFile, deleteManualFile, manualSummary } from '../../../lib/manualFile';
@@ -38,6 +55,10 @@ import { consumePendingPick } from '../../../lib/pendingPick';
 
 let _sid = 0;
 const newStageId = () => 'st_' + Date.now().toString(36) + '_' + (_sid++);
+
+// Same date format the Detail screens use, so "Last replaced: …" reads
+// identically wherever it appears.
+const fmtDate = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function EditDevice() {
   const t = useTheme();
@@ -48,6 +69,8 @@ export default function EditDevice() {
   const [draft, setDraft] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
+  // Which filter's last-replaced date we're editing (filterId), or null.
+  const [dateFor, setDateFor] = useState(null);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -113,11 +136,31 @@ export default function EditDevice() {
   // Preview of the icon Auto would derive from the currently-picked filters.
   const autoType = deviceDisplayType({ stages: filterIds.map(id => ({ filterId: id })) }, data);
 
+  // The last-replaced date currently held for a given filter (from an existing
+  // stage, or one just set in this editing session). Undefined for a freshly
+  // attached filter that hasn't been given a date yet -> shows "Not set".
+  const lastReplacedFor = (pid) => (draft.preserved[pid] || {}).lastReplaced || null;
+
   const openAssetPicker = () =>
     router.push({ pathname: '/picker', params: { kind: 'asset', selectedId: draft.assetId || '', deviceId: id } });
 
   const openFiltersPicker = () =>
     router.push({ pathname: '/picker', params: { kind: 'filter', multi: '1', selectedIds: filterIds.join(',') } });
+
+  // Write the picked date into preserved[pid]. save() reads this back into the
+  // stage; a freshly-attached filter with no preserved entry gets one here
+  // (no stage id yet — save() mints one via newStageId()).
+  const onConfirmDate = (date) => {
+    const pid = dateFor;
+    if (!pid) { setDateFor(null); return; }
+    const safe = date > new Date() ? new Date() : date;   // never future
+    setDraft(prev => {
+      const preserved = { ...prev.preserved };
+      preserved[pid] = { ...(preserved[pid] || {}), lastReplaced: safe.toISOString() };
+      return { ...prev, preserved };
+    });
+    setDateFor(null);
+  };
 
   const save = async () => {
     // Filters are the only schedule source. No filters -> a single filterless stage
@@ -187,6 +230,10 @@ export default function EditDevice() {
     );
   };
 
+  // Title + initial date for the date sheet (name of the filter being edited).
+  const dateForFilter = dateFor ? filters.find(p => p.id === dateFor) : null;
+  const dateForCurrent = dateFor ? lastReplacedFor(dateFor) : null;
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
@@ -253,22 +300,37 @@ export default function EditDevice() {
 
         {selectedFilters.length > 0 && (
           <View style={s.filtersBox}>
-            {selectedFilters.map((p, i) => (
-              <View key={p.id} style={[s.filterRow, i > 0 && s.filterRowDivider]}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.filterName} numberOfLines={1}>{p.name || 'Untitled filter'}</Text>
-                  <Text style={s.filterSub} numberOfLines={1}>
-                    Every {formatInterval(p.intervalDays != null ? p.intervalDays : DEFAULT_INTERVAL_DAYS)}
-                    {p.sku ? `  ·  ${p.sku}` : ''}
-                  </Text>
-                </View>
-              </View>
-            ))}
+            {selectedFilters.map((p, i) => {
+              const lr = lastReplacedFor(p.id);
+              return (
+                // Tap a filter to set when it was last replaced (opens the same
+                // date sheet as Mark Replaced). The "Last replaced" line below
+                // is the visual confirmation of what the app has recorded.
+                <Pressable
+                  key={p.id}
+                  style={({ pressed }) => [s.filterRow, i > 0 && s.filterRowDivider, pressed && s.filterRowPressed]}
+                  onPress={() => setDateFor(p.id)}
+                >
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.filterName} numberOfLines={1}>{p.name || 'Untitled filter'}</Text>
+                    <Text style={s.filterSub} numberOfLines={1}>
+                      Every {formatInterval(p.intervalDays != null ? p.intervalDays : DEFAULT_INTERVAL_DAYS)}
+                      {p.sku ? `  ·  ${p.sku}` : ''}
+                    </Text>
+                    <Text style={s.lastReplaced} numberOfLines={1}>
+                      Last replaced: <Text style={lr ? s.lrSet : s.lrUnset}>{lr ? fmtDate(lr) : 'Not set'}</Text>
+                    </Text>
+                  </View>
+                  <Text style={s.chev}>›</Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
         <Text style={s.hint}>
           Attach a filter to track stock, reorders, and replacement intervals.
+          Tap a filter to set when it was last replaced.
         </Text>
 
         <Text style={s.label}>PRODUCT URL</Text>
@@ -311,6 +373,17 @@ export default function EditDevice() {
         onCancel={() => setIconOpen(false)}
         onSave={(name) => { setDraft({ ...draft, icon: name }); setIconOpen(false); }}
       />
+
+      {/* Same date sheet as Mark Replaced. initialDate = the stage's current
+          last-replaced (or today for a fresh one); capped at today. */}
+      <DatePickerModal
+        visible={!!dateFor}
+        initialDate={dateForCurrent ? new Date(dateForCurrent) : new Date()}
+        maximumDate={new Date()}
+        title={dateForFilter ? (dateForFilter.name || 'Last Replaced') : 'Last Replaced'}
+        onCancel={() => setDateFor(null)}
+        onConfirm={onConfirmDate}
+      />
     </SafeAreaView>
   );
 }
@@ -351,12 +424,19 @@ function makeStyles(t) {
     // t.radius.chip), not the lighter t.line of the text fields beside it.
     iconBox: { width: 50, height: 50, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
 
-    // Selected-filters list (each filter = a tracked line / stage).
+    // Selected-filters list (each filter = a tracked line / stage). Rows are
+    // now tappable (set last-replaced), so they carry a chevron + pressed state.
     filtersBox: { marginTop: 10, backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
-    filterRow: { paddingVertical: 12 },
+    filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
     filterRowDivider: { borderTopWidth: 1, borderTopColor: t.line },
+    filterRowPressed: { backgroundColor: t.tabIdleBg },
     filterName: { fontSize: 15, fontWeight: '700', color: t.ink },
     filterSub: { fontSize: 12.5, color: t.muted, marginTop: 3 },
+    // Last-replaced confirmation line. "Not set" is muted/italic to flag the
+    // onboarding case; a real date reads in ink so it's clearly recorded.
+    lastReplaced: { fontSize: 12.5, color: t.muted, marginTop: 6 },
+    lrSet: { color: t.ink, fontWeight: '700' },
+    lrUnset: { color: t.muted, fontStyle: 'italic', fontWeight: '600' },
 
     hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
 
