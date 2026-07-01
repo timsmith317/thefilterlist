@@ -9,9 +9,9 @@
 // shifts. That's what makes it feel natural — no forced single-open, no
 // driven scrolling, no moving target.
 //
-// Sections mirror the model — How it works -> Devices -> Filters -> Schedule &
-// status -> Stock -> Getting started — then a "Welcome Tour" card as
-// the last row in the stack (same chrome as the sections, but a tap-action
+// Sections: How it works -> Filter tracking tips -> Devices -> Filters ->
+// Schedule & status -> Stock -> Getting started — then a "Welcome Tour" card
+// as the last row in the stack (same chrome as the sections, but a tap-action
 // with a static right-pointing chevron, like a Settings hub row).
 //
 // Auto-routed by expo-router (like About/Backup/Reminders); no Stack.Screen
@@ -110,6 +110,24 @@ export default function Help() {
           <Text style={s.li}><Text style={s.b}>Device</Text> — equipment that takes a replaceable filter: a furnace, the fridge, an under-sink RO system, your car's cabin.</Text>
           <Text style={s.li}><Text style={s.b}>Filter</Text> — the actual replaceable part: the cartridge or element you swap on a schedule.</Text>
           <Text style={s.p}>So your House (asset) has a Furnace (device) that uses a MERV 11 (filter).</Text>
+        </Section>
+
+        <Section s={s} title="Filter Tracking Tips" desc="Ideas for what to track" open={!!openMap.track} onToggle={() => toggle('track')}>
+          <Text style={s.p0}>If it has a filter or a wear part, it probably belongs here. A few ideas:</Text>
+          <Text style={s.li}>•  HVAC Air Filters</Text>
+          <Text style={s.li}>•  Water Filters</Text>
+          <Text style={s.li}>•  Refrigerator Air Filters</Text>
+          <Text style={s.li}>•  Refrigerator Water Filters</Text>
+          <Text style={s.li}>•  CPAP Machines</Text>
+          <Text style={s.li}>•  Dehumidifiers</Text>
+          <Text style={s.li}>•  Air Purifiers</Text>
+          <Text style={s.li}>•  Vacuum Cleaners</Text>
+          <Text style={s.li}>•  Car Cabin Air Filters</Text>
+          <Text style={s.li}>•  Car Engine Air Filters</Text>
+          <Text style={s.li}>•  Range Hood Air Filters</Text>
+          <Text style={s.li}>•  Dryer Lint Filters</Text>
+          <Text style={s.li}>•  Dishwashers</Text>
+          <Text style={s.li}>•  Faucet Aerators</Text>
         </Section>
 
         <Section s={s} title="Devices" desc="Name, icon, model, manuals, notes" open={!!openMap.devices} onToggle={() => toggle('devices')}>
