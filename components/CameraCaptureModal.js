@@ -2,24 +2,31 @@
 // style, replacing the full-screen iOS system camera (expo-image-picker's
 // launchCameraAsync) for a more custom feel.
 //
+// Now built on react-native-vision-camera (matching Hanger's proven camera
+// stack) instead of expo-camera. The reason for the swap: expo-camera's config
+// plugin injects an NSMicrophoneUsageDescription that can't be cleanly removed,
+// which is an App Store 5.1.1(ii) rejection risk. vision-camera does not inject
+// a mic key (its plugin is pinned with enableMicrophonePermission:false in
+// app.config.js), so this app requests only the camera — no microphone.
+//
 // Same themed iOS SHEET (presentationStyle="pageSheet") as the viewer/cropper:
 // white background and the app's ‹ Back, but the framed area is a LARGE,
-// near-full-bleed live camera preview (expo-camera's CameraView) rather than a
-// small square — easier to aim. A round shutter captures; a Flip control swaps
-// front/back.
+// near-full-bleed live camera preview rather than a small square — easier to
+// aim. A round shutter captures; a Flip control swaps front/back.
 //
 // On capture, onCapture({ uri, width, height }) hands the photo to the SAME
 // PhotoCropper the library flow uses, so framing/crop stays identical. This
-// component only captures; it never persists.
+// component only captures; it never persists. vision-camera returns a bare
+// filesystem `path`; we prefix it to a file:// URI so the cropper (and the rest
+// of the app, which expects URIs) can consume it unchanged.
 //
-// expo-camera is a native module — needs a dev rebuild (it was added via
-// `expo install expo-camera`). Camera permission is requested on open; a denied
-// state offers Settings.
+// vision-camera is a native module — needs a dev rebuild. The live preview does
+// NOT render in Mac screen-mirroring; test on the physical device.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useTheme } from '../theme/theme';
 import { BackButton } from './HeaderBits';
 
@@ -27,34 +34,52 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   const t = useTheme();
   const s = makeStyles(t);
   const camRef = useRef(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState('back');
+
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const [position, setPosition] = useState('back');
+  const device = useCameraDevice(position);
   const [busy, setBusy] = useState(false);
+  // Tracks whether we've already prompted this open, so a denied state can
+  // switch from "Allow Camera" (re-request) to "Open Settings" (iOS won't
+  // prompt again). vision-camera's hook has no canAskAgain flag, so we infer it.
+  const [askedOnce, setAskedOnce] = useState(false);
 
-  // Ask for camera access when the sheet opens, if we still can.
+  // Ask for camera access when the sheet opens, if we don't have it yet.
   useEffect(() => {
-    if (visible && permission && !permission.granted && permission.canAskAgain) {
-      requestPermission();
+    if (visible && !hasPermission) {
+      requestPermission().finally(() => setAskedOnce(true));
     }
+    if (!visible) setAskedOnce(false); // reset for next open
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, permission?.granted]);
+  }, [visible, hasPermission]);
 
-  const flip = () => setFacing(f => (f === 'back' ? 'front' : 'back'));
+  const flip = () => setPosition((p) => (p === 'back' ? 'front' : 'back'));
 
   const shoot = async () => {
     if (busy || !camRef.current) return;
     setBusy(true);
     try {
-      const photo = await camRef.current.takePictureAsync({ quality: 1 });
+      const photo = await camRef.current.takePhoto({ flash: 'off' });
+      // vision-camera returns a bare path; the rest of the app expects a URI.
+      const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
       setBusy(false);
-      if (photo && photo.uri) onCapture({ uri: photo.uri, width: photo.width, height: photo.height });
+      // IMPORTANT: do NOT pass photo.width/height. vision-camera reports sensor
+      // dimensions in the sensor's native orientation, which for a portrait shot
+      // disagrees with how the file actually displays (EXIF rotation). Passing
+      // them made PhotoCropper lay out with the wrong aspect, so a square crop
+      // saved as a tall rectangle. Omitting them makes the cropper fall back to
+      // Image.getSize(uri) — the SAME EXIF-correct path library picks use — so
+      // camera captures now crop identically to library photos.
+      onCapture({ uri });
     } catch (e) {
       setBusy(false);
-      console.warn('takePictureAsync failed', e);
+      console.warn('takePhoto failed', e);
     }
   };
 
-  const granted = !!(permission && permission.granted);
+  // Only run the camera session while the sheet is open AND we have permission
+  // AND a device exists — releases the camera when the sheet closes.
+  const active = !!(visible && hasPermission && device);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
@@ -62,7 +87,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
         <SafeAreaView style={s.safe} edges={['bottom']}>
           <View style={s.head}>
             <BackButton onPress={onCancel} />
-            {granted && (
+            {hasPermission && !!device && (
               <Pressable onPress={flip} hitSlop={10} style={s.flipBtn}>
                 <Text style={s.flipTxt}>Flip</Text>
               </Pressable>
@@ -70,20 +95,11 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
           </View>
 
           <View style={s.area}>
-            {!permission ? (
-              <View style={s.frame}><ActivityIndicator color={t.muted} /></View>
-            ) : granted ? (
-              <View style={s.frame}>
-                <CameraView ref={camRef} style={StyleSheet.absoluteFill} facing={facing} />
-                {busy && (
-                  <View style={s.busyOverlay} pointerEvents="none"><ActivityIndicator color="#fff" /></View>
-                )}
-              </View>
-            ) : (
+            {!hasPermission ? (
               <View style={s.denied}>
                 <Text style={s.deniedTitle}>Camera access needed</Text>
                 <Text style={s.deniedSub}>Allow camera access to take a photo of this filter.</Text>
-                {permission.canAskAgain ? (
+                {!askedOnce ? (
                   <Pressable style={s.cta} onPress={() => requestPermission()}>
                     <Text style={s.ctaTxt}>Allow Camera</Text>
                   </Pressable>
@@ -93,11 +109,35 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
                   </Pressable>
                 )}
               </View>
+            ) : !device ? (
+              // vision-camera can return a null device (e.g. simulator, or the
+              // requested position isn't available) — expo-camera never did, so
+              // this guard is new and prevents a crash.
+              <View style={s.denied}>
+                <Text style={s.deniedTitle}>No camera available</Text>
+                <Text style={s.deniedSub}>Couldn't find the {position} camera on this device.</Text>
+                <Pressable style={s.cta} onPress={flip}>
+                  <Text style={s.ctaTxt}>Try other camera</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={s.frame}>
+                <Camera
+                  ref={camRef}
+                  style={StyleSheet.absoluteFill}
+                  device={device}
+                  isActive={active}
+                  photo={true}
+                />
+                {busy && (
+                  <View style={s.busyOverlay} pointerEvents="none"><ActivityIndicator color="#fff" /></View>
+                )}
+              </View>
             )}
           </View>
 
           <View style={s.shutterRow}>
-            {granted && (
+            {hasPermission && !!device && (
               <Pressable onPress={shoot} disabled={busy} hitSlop={10} style={[s.shutterOuter, busy && { opacity: 0.5 }]}>
                 <View style={s.shutterInner} />
               </Pressable>
@@ -145,9 +185,11 @@ function makeStyles(t) {
 
     shutterRow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 22 },
     shutterOuter: {
-      width: 74, height: 74, borderRadius: 999, borderWidth: 4, borderColor: t.line,
+      // Darker ring holds a lighter fill — the contrast is what reads as a
+      // shutter button. Ring darker than fill (iconBorder vs tabIdleBg).
+      width: 74, height: 74, borderRadius: 999, borderWidth: 4, borderColor: t.iconBorder,
       alignItems: 'center', justifyContent: 'center',
     },
-    shutterInner: { width: 58, height: 58, borderRadius: 999, backgroundColor: t.iconBorder },
+    shutterInner: { width: 58, height: 58, borderRadius: 999, backgroundColor: t.tabIdleBg },
   });
 }
