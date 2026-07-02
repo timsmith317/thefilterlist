@@ -19,6 +19,11 @@ const PILL_NUDGE = -4;            // status-pill vertical nudge; negative = up
 // border constants control the light ring around it. Set WIDTH to 0 to
 // remove the ring. COLOR null falls back to the theme's light border.
 const LOGO_SIZE         = 32;
+// The header app icon looked slightly oversized on iPad at the full ui() (1.2)
+// bump. LOGO_TABLET_SCALE gives it its own gentler multiplier so it sits right
+// in the brand lockup. 1.0 = keep iPhone size on iPad; 1.1 = slight bump.
+// Tune to taste; applied only on tablet (iPhone always uses LOGO_SIZE as-is).
+const LOGO_TABLET_SCALE = 1.05;
 const LOGO_BORDER_COLOR = '#14532D';   // e.g. '#d7dce1'; null = theme iconBorder
 const LOGO_BORDER_WIDTH = 0;      // ring thickness in px (0 = no ring)
 const LOGO_BORDER_GAP   = 1;      // gap between the ring and the icon (px)
@@ -29,6 +34,10 @@ const LOGO_BORDER_GAP   = 1;      // gap between the ring and the icon (px)
 // vertical lines as the icon-left and status-pill-right of each card.
 // Change CARD_PADDING in one place and everything tracks.
 const CARD_PADDING = 14;
+// iPad: cards lay out in a responsive grid instead of one wide column.
+// TABLET_COLUMNS is the column count on iPad (iPhone always = 1). 2 is the
+// natural fit for these cards; tune if you later want 3 on a large iPad.
+const TABLET_COLUMNS = 2;
 // =================================================================
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
@@ -42,10 +51,12 @@ import {
   loadData, dueSoonList, devicesForAssetId, assetsList, dueCount,
 } from '../data/store';
 import { formatInterval } from '../lib/interval';
+import useFixScrollToTop from '../lib/useFixScrollToTop';
 
 
 export default function DueSoon() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const [data, setData] = useState(null);
   const [tab, setTab] = useState('All');
@@ -66,14 +77,14 @@ export default function DueSoon() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={[s.brandRow, { transform: [{ translateX: LOCKUP_NUDGE }] }]}>
-        <View style={s.logoBorder}><BrandMark size={LOGO_SIZE} /></View>
-        <Wordmark color={WORDMARK_COLOR || t.ink} size={WORDMARK_SIZE} />
+        <View style={s.logoBorder}><BrandMark size={t.isTablet ? Math.round(LOGO_SIZE * LOGO_TABLET_SCALE) : LOGO_SIZE} /></View>
+        <Wordmark color={WORDMARK_COLOR || t.ink} size={t.uit(WORDMARK_SIZE)} />
       </View>
       <View style={s.titleRow}>
         <Text style={s.title}>Due Soon</Text>
         <View style={s.settingsWrap}>
           <Pressable style={s.settings} onPress={() => router.push('/settings')} hitSlop={8}>
-            <IconGear size={16} color={t.ink} />
+            <IconGear size={t.ui(16)} color={t.ink} />
             <Text style={s.settingsTxt}>Settings</Text>
           </Pressable>
         </View>
@@ -86,7 +97,7 @@ export default function DueSoon() {
           inset (matching the icon and status-pill alignment lines of
           the cards below). Still a horizontal ScrollView so that if
           enough categories are added to overflow, the row scrolls. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabsWrap} contentContainerStyle={s.tabs}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabsWrap} contentContainerStyle={[s.tabs, t.isTablet && s.tabsTablet]}>
         {tabs.map(tb => {
           const on = tab === tb.id;
           return (
@@ -96,17 +107,17 @@ export default function DueSoon() {
           );
         })}
       </ScrollView>
-      <ScrollView style={s.list} contentContainerStyle={s.listContent}>
+      <ScrollView scrollsToTop={scrollsToTop} style={s.list} contentContainerStyle={[s.listContent, t.isTablet && s.listContentTablet]}>
         {list.length === 0 && <Text style={s.empty}>No devices here yet.</Text>}
         {list.map(f => {
           const tone = t.status[f.status.key];
           const multi = f.status.stageCount > 1;
           const noFilters = f.status.stageCount === 0;
           return (
-            <Pressable key={f.id} style={s.card} onPress={() => router.push(`/device/${f.id}`)}>
+            <Pressable key={f.id} style={[s.card, t.isTablet && s.cardTablet]} onPress={() => router.push(`/device/${f.id}`)}>
               {/* Icon chip top-aligned with the title (alignItems: flex-start on
                   the card), so single- and multi-line cards both look aligned. */}
-              <View style={s.iconChip}><DeviceIcon iconName={f.icon} displayType={f.displayType} size={32} color={t.iconInk} /></View>
+              <View style={s.iconChip}><DeviceIcon iconName={f.icon} displayType={f.displayType} size={t.ui(32)} color={t.iconInk} /></View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 {/* Title + status pill share the top line. The title stays a
                     single line and truncates (we'd rather clip than wrap and
@@ -168,10 +179,10 @@ function makeStyles(t) {
     // Canonical screen title — 26/800/0.5. Matches every other screen.
     title: { ...t.type.screenTitle, color: t.ink },
     settingsWrap: { paddingTop: 5 },
-    settings: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: t.tabIdleBg },
+    settings: { flexDirection: 'row', alignItems: 'center', gap: t.ui(7), paddingHorizontal: t.ui(14), paddingVertical: t.ui(7), borderRadius: 999, backgroundColor: t.tabIdleBg },
     // Bold + full black to match the app's pill labels (Edit, Save, Done, etc.).
-    settingsTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
-    sub: { fontSize: 13, color: t.muted, paddingHorizontal: CONTENT_INSET, paddingBottom: 4 },
+    settingsTxt: { fontSize: t.uit(14), fontWeight: '700', color: t.ink },
+    sub: { fontSize: t.uit(13), color: t.muted, paddingHorizontal: CONTENT_INSET, paddingBottom: 4 },
     tabsWrap: { flexGrow: 0 },
     // flexGrow: 1 stretches the content container to at least the
     // ScrollView width, so justifyContent: 'space-between' actually
@@ -189,18 +200,44 @@ function makeStyles(t) {
       paddingBottom: t.space.sm,
       gap: t.space.sm,
     },
-    tab: { paddingHorizontal: t.space.lg, paddingVertical: 7, borderRadius: t.radius.md, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.line },
+    // iPad: don't stretch pills across the full width. flexGrow:0 lets the row
+    // size to its content, and a larger gap gives comfortable fixed spacing so
+    // the pills cluster at the left inset instead of drifting to the far edges.
+    tabsTablet: {
+      flexGrow: 0,
+      justifyContent: 'flex-start',
+      gap: t.ui(12),
+    },
+    tab: { paddingHorizontal: t.space.lg, paddingVertical: t.ui(7), borderRadius: t.radius.md, backgroundColor: t.card, borderWidth: 1.5, borderColor: t.line },
     tabOn: { backgroundColor: t.tabIdleBg },
-    tabTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    tabTxt: { fontSize: t.uit(13), fontWeight: '600', color: t.inkSoft },
     tabTxtOn: { color: t.ink, fontWeight: '700' },
     list: { flex: 1 },
     listContent: { paddingHorizontal: t.space.lg, paddingTop: t.space.md, gap: 11 },
+    // iPad grid: wrap cards into rows. flexDirection row + wrap, with a gap
+    // between cards (both directions). Each card carries an explicit width
+    // (cardTablet) so exactly TABLET_COLUMNS fit per row.
+    listContentTablet: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: t.ui(12),
+    },
     empty: { padding: 24, textAlign: 'center', color: t.muted, fontStyle: 'italic' },
     // alignItems: flex-start so the icon chip and the title/pill row both align
     // to the TOP of the card. padding uses CARD_PADDING so the title/sub/tabs
     // alignment math above stays in sync if this ever changes.
     card: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, padding: CARD_PADDING, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: t.radius.card },
-    iconChip: { width: 44, height: 44, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
+    // iPad card width: two columns that account for the inter-card gap.
+    // With flexWrap + a row `gap`, two 50% cards would overflow (50%+50%+gap
+    // > 100%). Using flexBasis with a calc-style subtraction isn't available in
+    // RN, so we express width as a percentage slightly under the even split and
+    // let the row gap provide the separation. For 2 columns: 48% each leaves
+    // room for the gap between them and a hair of tolerance. Percentage keeps it
+    // fluid across portrait/landscape rotation.
+    cardTablet: {
+      width: TABLET_COLUMNS === 2 ? '48.5%' : `${Math.floor(100 / TABLET_COLUMNS) - 2}%`,
+    },
+    iconChip: { width: t.ui(44), height: t.ui(44), borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
     // Title + status pill on one row, top-aligned. Title takes the remaining
     // width and truncates; pill hugs the right edge.
     topRow: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -210,9 +247,9 @@ function makeStyles(t) {
     // edge so it sits directly under the status pill.
     metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
     cardMeta: { ...t.type.meta, color: t.muted, flex: 1, marginRight: 8 },
-    stagesBadge: { backgroundColor: t.tabIdleBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-    stagesBadgeTxt: { fontSize: 11, fontWeight: '700', color: t.inkSoft },
-    pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
+    stagesBadge: { backgroundColor: t.tabIdleBg, paddingHorizontal: t.ui(8), paddingVertical: t.ui(2), borderRadius: t.radius.pill },
+    stagesBadgeTxt: { fontSize: t.uit(11), fontWeight: '700', color: t.inkSoft },
+    pill: { paddingHorizontal: t.ui(9), paddingVertical: t.ui(4), borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },
   });
 }

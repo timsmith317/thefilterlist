@@ -29,6 +29,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableFlatList from 'react-native-draggable-flatlist';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton, PillButton } from '../../components/HeaderBits';
@@ -42,6 +43,7 @@ export default function AssetsSettings() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const scrollsToTop = useFixScrollToTop();
   const [data, setData] = useState(null);
   const [assets, setAssets] = useState([]); // active, in order — the drag list
 
@@ -176,6 +178,7 @@ export default function AssetsSettings() {
 
         <DraggableFlatList
           data={assets}
+          scrollsToTop={scrollsToTop}
           containerStyle={{ flex: 1 }}
           onContainerLayout={({ layout }) => setViewportH(layout.height)}
           onContentSizeChange={(w, h) => setContentH(h)}
@@ -282,11 +285,11 @@ function makeStyles(t) {
     listContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 18 },
 
     title: { ...t.type.screenTitle, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 18, lineHeight: 18 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 18, lineHeight: 18 },
 
     labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', paddingLeft: 13, marginBottom: 8 },
-    empty: { fontSize: 14, color: t.muted, paddingLeft: 13, paddingTop: 4, lineHeight: 20 },
+    empty: { fontSize: t.uit(14), color: t.muted, paddingLeft: 13, paddingTop: 4, lineHeight: 20 },
 
     row: {
       flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -296,16 +299,16 @@ function makeStyles(t) {
     },
     rowActive: { borderColor: t.ink, opacity: 0.95 },
     rowMain: { flex: 1, minWidth: 0 },
-    rowName: { fontSize: 16, fontWeight: '700', color: t.ink },
-    rowMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
+    rowName: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
+    rowMeta: { fontSize: t.uit(13), color: t.muted, marginTop: 3 },
 
-    chev: { fontSize: 22, color: t.muted, paddingLeft: 4 },
-    dragHandle: { fontSize: 22, color: t.muted, marginLeft: 2 },
+    chev: { fontSize: t.uit(22), color: t.muted, paddingLeft: 4 },
+    dragHandle: { fontSize: t.uit(22), color: t.muted, marginLeft: 2 },
 
     // "Mark Replaced"-style button: grey fill, no border, bold black.
     addBtn: { padding: 14, borderRadius: t.radius.btn, backgroundColor: t.tabIdleBg, alignItems: 'center' },
     addBtnInline: { marginTop: 12 },
-    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    addBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     footer: {
       position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -315,14 +318,14 @@ function makeStyles(t) {
     // Full-screen Edit Asset sheet.
     sheetSafe: { flex: 1, backgroundColor: t.bg },
     sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6 },
-    sheetCancel: { color: t.inkSoft, fontSize: 15 },
-    sheetTitle: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sheetSub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    sheetCancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    sheetTitle: { ...t.type.title, fontSize: t.uit(26), color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sheetSub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
     sheetLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
     sheetBottomAction: { marginTop: 32, paddingTop: 18, borderTopWidth: 1, borderTopColor: t.line, alignItems: 'center' },
-    sheetBottomActionTxt: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5, color: t.inkSoft, textTransform: 'uppercase' },
+    sheetBottomActionTxt: { fontSize: t.uit(14), fontWeight: '700', letterSpacing: 0.5, color: t.inkSoft, textTransform: 'uppercase' },
 
-    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
-    errorTxt: { fontSize: 13, color: '#b3261e', marginTop: 12, paddingLeft: 13 },
+    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
+    errorTxt: { fontSize: t.uit(13), color: '#b3261e', marginTop: 12, paddingLeft: 13 },
   });
 }

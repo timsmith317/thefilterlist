@@ -11,11 +11,13 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
 import { loadData, filtersList, isFilterLow, devicesUsingFilter } from '../../data/store';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 export default function FiltersInventory() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const scrollsToTop = useFixScrollToTop();
   const [data, setData] = useState(null);
 
   // Hug-then-pin Add button (see assets.js for the rationale).
@@ -45,6 +47,7 @@ export default function FiltersInventory() {
 
       <ScrollView
         style={{ flex: 1 }}
+        scrollsToTop={scrollsToTop}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setContentH(h)}
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: (overflow ? footerH : 0) + 16 }}
@@ -101,14 +104,14 @@ function makeStyles(t) {
     safe: { flex: 1, backgroundColor: t.bg },
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
     // Title indented by card's interior padding (14) to align with card text.
-    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 14 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 14 },
+    title: { ...t.type.title, fontSize: t.uit(26), color: t.ink, marginTop: 4, paddingLeft: 14 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 14 },
     row: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 12, padding: 14, marginBottom: 10, gap: 10 },
-    rowName: { fontSize: 15, fontWeight: '600', color: t.ink },
-    rowMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
+    rowName: { fontSize: t.uit(15), fontWeight: '600', color: t.ink },
+    rowMeta: { fontSize: t.uit(12), color: t.muted, marginTop: 3 },
     lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
-    chev: { fontSize: 22, color: t.muted },
+    lowPillTxt: { color: t.status.amb.pillInk, fontSize: t.uit(11), fontWeight: '700' },
+    chev: { fontSize: t.uit(22), color: t.muted },
 
     // Matches the "Mark Replaced" / Add buttons on Categories & Assets:
     // grey fill, no border, bold black.
@@ -119,7 +122,7 @@ function makeStyles(t) {
       alignItems: 'center',
     },
     addBtnInline: { marginTop: 6 },
-    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    addBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     // Pinned footer bar (opaque so the list scrolls behind it cleanly).
     footer: {

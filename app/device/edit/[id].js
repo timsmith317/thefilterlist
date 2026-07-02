@@ -230,8 +230,7 @@ export default function EditDevice() {
     );
   };
 
-  // Title + initial date for the date sheet (name of the filter being edited).
-  const dateForFilter = dateFor ? filters.find(p => p.id === dateFor) : null;
+  // Initial date for the date sheet (the stage's current last-replaced).
   const dateForCurrent = dateFor ? lastReplacedFor(dateFor) : null;
 
   return (
@@ -244,7 +243,7 @@ export default function EditDevice() {
       </View>
 
       <KeyboardAwareScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingBottom: 40 }}
         bottomOffset={20}
         keyboardShouldPersistTaps="handled"
       >
@@ -380,7 +379,7 @@ export default function EditDevice() {
         visible={!!dateFor}
         initialDate={dateForCurrent ? new Date(dateForCurrent) : new Date()}
         maximumDate={new Date()}
-        title={dateForFilter ? (dateForFilter.name || 'Last Replaced') : 'Last Replaced'}
+        title="Last Replaced"
         onCancel={() => setDateFor(null)}
         onConfirm={onConfirmDate}
       />
@@ -393,31 +392,31 @@ function makeStyles(t) {
     safe: { flex: 1, backgroundColor: t.bg },
     head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 22, paddingBottom: 6,
+      paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingTop: 22, paddingBottom: 6,
     },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15), paddingLeft: 16 },
+    title: { ...t.type.title, fontSize: t.uit(26), color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
-    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
+    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
     notesInput: {
       padding: 13, borderRadius: 10, borderWidth: 1.5,
-      borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16,
+      borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16),
       minHeight: 110, textAlignVertical: 'top',
     },
     typeRow: { flexDirection: 'row', gap: 8 },
     typeChip: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: t.radius.chip, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
     typeChipOn: { backgroundColor: t.tabIdleBg },
-    typeLabel: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    typeLabel: { fontSize: t.uit(13), fontWeight: '600', color: t.inkSoft },
     typeLabelOn: { color: t.ink, fontWeight: '700' },
     pickerRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5,
       borderColor: t.line, backgroundColor: t.card,
     },
-    pickerValue: { fontSize: 16, color: t.ink, flex: 1, marginRight: 8 },
+    pickerValue: { fontSize: t.uit(16), color: t.ink, flex: 1, marginRight: 8 },
     pickerPlaceholder: { color: t.muted },
-    chev: { fontSize: 20, lineHeight: 22, color: t.muted },
+    chev: { fontSize: t.uit(20), lineHeight: 22, color: t.muted },
     nameRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
     iconLabel: { paddingLeft: 0, textAlign: 'center' },
     // Icon box border matches the index-page icon chips (t.iconBorder +
@@ -430,17 +429,17 @@ function makeStyles(t) {
     filterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
     filterRowDivider: { borderTopWidth: 1, borderTopColor: t.line },
     filterRowPressed: { backgroundColor: t.tabIdleBg },
-    filterName: { fontSize: 15, fontWeight: '700', color: t.ink },
-    filterSub: { fontSize: 12.5, color: t.muted, marginTop: 3 },
+    filterName: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
+    filterSub: { fontSize: t.uit(12.5), color: t.muted, marginTop: 3 },
     // Last-replaced confirmation line. "Not set" is muted/italic to flag the
     // onboarding case; a real date reads in ink so it's clearly recorded.
-    lastReplaced: { fontSize: 12.5, color: t.muted, marginTop: 6 },
+    lastReplaced: { fontSize: t.uit(12.5), color: t.muted, marginTop: 6 },
     lrSet: { color: t.ink, fontWeight: '700' },
     lrUnset: { color: t.muted, fontStyle: 'italic', fontWeight: '600' },
 
-    hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 10, paddingLeft: 13 },
 
     delBtn: { marginTop: 28, padding: 12, alignItems: 'center' },
-    delTxt: { color: '#dc2626', fontSize: 14 },
+    delTxt: { color: '#dc2626', fontSize: t.uit(14) },
   });
 }

@@ -114,9 +114,9 @@ export default function IconPickerModal({ visible, value = null, onCancel, onSav
                           name={name}
                           type="monochrome"
                           tintColor={t.iconInk}
-                          size={28}
+                          size={t.ui(28)}
                           resizeMode="scaleAspectFit"
-                          fallback={<IconOther size={28} color={t.iconInk} />}
+                          fallback={<IconOther size={t.ui(28)} color={t.iconInk} />}
                         />
                       </Pressable>
                     );
@@ -143,16 +143,16 @@ function makeStyles(t) {
     },
     headSlot: { flex: 1, justifyContent: 'center', alignItems: 'flex-start' },
     headSlotRight: { alignItems: 'flex-end' },
-    cancel: { color: t.inkSoft, fontSize: 16 },
-    title: { fontSize: 16, fontWeight: '700', color: t.ink, textAlign: 'center' },
+    cancel: { color: t.inkSoft, fontSize: t.uit(16) },
+    title: { fontSize: t.uit(16), fontWeight: '700', color: t.ink, textAlign: 'center' },
 
     scroll: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40 },
 
     kicker: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 24, marginBottom: 12 },
 
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: t.ui(14) },
     tile: {
-      width: 60, height: 60, borderRadius: 14,
+      width: t.ui(60), height: t.ui(60), borderRadius: t.ui(14),
       borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
       alignItems: 'center', justifyContent: 'center',
     },

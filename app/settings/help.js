@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
 import { replayOnboarding } from '../../components/OnboardingModal';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 // LayoutAnimation needs this opt-in on Android (no-op/harmless on iOS).
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -81,6 +82,7 @@ function Section({ s, title, desc, open, onToggle, children }) {
 
 export default function Help() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const s = makeStyles(t);
   const router = useRouter();
 
@@ -99,7 +101,7 @@ export default function Help() {
         <View />
       </View>
 
-      <ScrollView style={s.scrollView} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView scrollsToTop={scrollsToTop} style={s.scrollView} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <Text style={s.title}>Help & Tips</Text>
         <Text style={s.sub}>How The Filter List works.</Text>
         <View style={s.listTop} />
@@ -193,7 +195,7 @@ function makeStyles(t) {
     scroll: { paddingHorizontal: 18, paddingBottom: 40 },
 
     title: { ...t.type.screenTitle, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, lineHeight: 18 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16, lineHeight: 18 },
     listTop: { height: 18 },
 
     // Each section is a bordered card; overflow hidden so the body's top
@@ -203,24 +205,24 @@ function makeStyles(t) {
       backgroundColor: t.card, marginBottom: 8, overflow: 'hidden',
     },
     headRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-    headTitle: { fontSize: 16, fontWeight: '700', color: t.ink },
-    headDesc: { fontSize: 13, color: t.muted, marginTop: 3 },
-    chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
+    headTitle: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
+    headDesc: { fontSize: t.uit(13), color: t.muted, marginTop: 3 },
+    chev: { fontSize: t.uit(22), color: t.muted, paddingLeft: 8 },
 
     body: {
       paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16,
       borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.line,
     },
     // p0 / li0 = first element in a body (no top margin). p / li add spacing.
-    p0: { fontSize: 14.5, color: t.inkSoft, lineHeight: 21 },
-    p: { fontSize: 14.5, color: t.inkSoft, lineHeight: 21, marginTop: 10 },
-    li0: { fontSize: 14.5, color: t.inkSoft, lineHeight: 21 },
-    li: { fontSize: 14.5, color: t.inkSoft, lineHeight: 21, marginTop: 9 },
+    p0: { fontSize: t.uit(14.5), color: t.inkSoft, lineHeight: 21 },
+    p: { fontSize: t.uit(14.5), color: t.inkSoft, lineHeight: 21, marginTop: 10 },
+    li0: { fontSize: t.uit(14.5), color: t.inkSoft, lineHeight: 21 },
+    li: { fontSize: t.uit(14.5), color: t.inkSoft, lineHeight: 21, marginTop: 9 },
     b: { fontWeight: '700', color: t.ink },
 
     legend: { marginTop: 12, gap: 9 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    legendTxt: { fontSize: 14.5, color: t.inkSoft, lineHeight: 21, flex: 1 },
+    legendTxt: { fontSize: t.uit(14.5), color: t.inkSoft, lineHeight: 21, flex: 1 },
     dot: { width: 10, height: 10, borderRadius: 5 },
 
     // Replay tour card — same paddings as a section headRow, flattened

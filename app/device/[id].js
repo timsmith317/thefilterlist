@@ -37,12 +37,14 @@ import {
 } from '../../data/store';
 import { formatInterval } from '../../lib/interval';
 import { openManualFile } from '../../lib/manualFile';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 export default function DeviceDetail() {
   const t = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const scrollsToTop = useFixScrollToTop();
   const [data, setData] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -133,16 +135,21 @@ export default function DeviceDetail() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <BackButton onPress={() => router.back()} />
-        <PillButton label="Edit" onPress={() => router.push(`/device/edit/${f.id}`)} />
+        <View style={{ paddingLeft: t.isTablet ? 16 : 0 }}>
+          <BackButton onPress={() => router.back()} />
+        </View>
+        <View style={{ paddingRight: t.isTablet ? 16 : 0 }}>
+          <PillButton label="Edit" onPress={() => router.push(`/device/edit/${f.id}`)} />
+        </View>
       </View>
 
       <ScrollView
+        scrollsToTop={scrollsToTop}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setContentH(h)}
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: (overflow ? footerH : 0) + 40, paddingTop: 4 }}
+        contentContainerStyle={{ paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingBottom: (overflow ? footerH : 0) + 40, paddingTop: 4 }}
       >
-        <View style={s.bigChip}><DeviceIcon iconName={f.icon} displayType={deviceDisplayType(f, data)} size={52} color={t.iconInk} /></View>
+        <View style={s.bigChip}><DeviceIcon iconName={f.icon} displayType={deviceDisplayType(f, data)} size={t.ui(52)} color={t.iconInk} /></View>
         <Text style={s.title}>{f.name}</Text>
         {!noStages && (
           <View style={[s.pill, { backgroundColor: tone.pillBg, alignSelf: 'flex-start', marginTop: 8, marginLeft: 16 }]}>
@@ -318,8 +325,8 @@ function StageCard({ t, s, stage, index, filter, fmt, onPress }) {
 function Row({ t, k, v, last }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 13, borderBottomWidth: last ? 0 : 1, borderBottomColor: t.line }}>
-      <Text style={{ color: t.muted, fontSize: 14 }}>{k}</Text>
-      <Text style={{ color: t.ink, fontSize: 14, fontWeight: '600', maxWidth: '60%', textAlign: 'right' }}>{v}</Text>
+      <Text style={{ color: t.muted, fontSize: t.uit(14) }}>{k}</Text>
+      <Text style={{ color: t.ink, fontSize: t.uit(14), fontWeight: '600', maxWidth: '60%', textAlign: 'right' }}>{v}</Text>
     </View>
   );
 }
@@ -345,9 +352,9 @@ function LinkBox({ t, s, url }) {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingTop: 8, paddingBottom: 6 },
 
-    bigChip: { width: 76, height: 76, borderRadius: 18, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginLeft: 16 },
+    bigChip: { width: t.ui(76), height: t.ui(76), borderRadius: t.ui(18), backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginLeft: 16 },
     title: { ...t.type.screenTitle, color: t.ink, marginTop: 14, paddingLeft: 16 },
 
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
@@ -357,10 +364,10 @@ function makeStyles(t) {
 
     // Stacked detail fields (DETAILS section), matching the Filter screen.
     detailLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
-    detailValue: { fontSize: 15, fontWeight: '600', color: t.ink, paddingLeft: 16 },
+    detailValue: { fontSize: t.uit(15), fontWeight: '600', color: t.ink, paddingLeft: 16 },
     openLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 13, borderRadius: 10, backgroundColor: t.tabIdleBg },
-    openLinkTxt: { color: t.ink, fontSize: 14, flex: 1, marginRight: 8 },
-    openLinkArrow: { color: t.inkSoft, fontSize: 18, fontWeight: '700' },
+    openLinkTxt: { color: t.ink, fontSize: t.uit(14), flex: 1, marginRight: 8 },
+    openLinkArrow: { color: t.inkSoft, fontSize: t.uit(18), fontWeight: '700' },
 
     notesRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingRight: 16, marginTop: 14 },
 
@@ -370,36 +377,36 @@ function makeStyles(t) {
     notesNudge: { transform: [{ translateY: -16 }] },
 
     notesInner: { alignSelf: 'flex-end' },
-    notesLinkTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
-    notesChev: { position: 'absolute', left: '100%', marginLeft: 4, top: -1, color: t.muted, fontSize: 17, lineHeight: 18, fontWeight: '700' },
+    notesLinkTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
+    notesChev: { position: 'absolute', left: '100%', marginLeft: 4, top: -1, color: t.muted, fontSize: t.uit(17), lineHeight: 18, fontWeight: '700' },
 
     filterCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14 },
     notesBox: { marginTop: 22, backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.line, padding: 14 },
     notesBoxLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginBottom: 8 },
-    notesBoxTxt: { fontSize: 14, color: t.ink, lineHeight: 20 },
+    notesBoxTxt: { fontSize: t.uit(14), color: t.ink, lineHeight: 20 },
     emptyFilters: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 16, marginTop: 4 },
-    emptyFiltersTxt: { fontSize: 14, color: t.muted, lineHeight: 20 },
-    filterName: { fontSize: 15, fontWeight: '700', color: t.ink, flex: 1, minWidth: 0 },
-    filterMeta: { fontSize: 12, color: t.muted, marginTop: 3 },
+    emptyFiltersTxt: { fontSize: t.uit(14), color: t.muted, lineHeight: 20 },
+    filterName: { fontSize: t.uit(15), fontWeight: '700', color: t.ink, flex: 1, minWidth: 0 },
+    filterMeta: { fontSize: t.uit(12), color: t.muted, marginTop: 3 },
     filterStockRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-    filterStock: { fontSize: 12.5, color: t.inkSoft, fontWeight: '600' },
+    filterStock: { fontSize: t.uit(12.5), color: t.inkSoft, fontWeight: '600' },
     lowPill: { backgroundColor: t.status.amb.pillBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11, fontWeight: '700' },
-    chev: { fontSize: 22, color: t.muted, marginLeft: 8 },
+    lowPillTxt: { color: t.status.amb.pillInk, fontSize: t.uit(11), fontWeight: '700' },
+    chev: { fontSize: t.uit(22), color: t.muted, marginLeft: 8 },
 
     // Multi-stage cards. Stacked with a small gap between them.
     stageCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 14, padding: 14, marginBottom: 10, marginHorizontal: 16 },
     stageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-    stageSched: { fontSize: 12.5, color: t.inkSoft, fontWeight: '600', marginTop: 6 },
+    stageSched: { fontSize: t.uit(12.5), color: t.inkSoft, fontWeight: '600', marginTop: 6 },
     // Last-replaced line — muted, sits between schedule and on-hand.
-    stageReplaced: { fontSize: 12.5, color: t.muted, fontWeight: '500', marginTop: 5 },
-    stageStock: { fontSize: 12.5, color: t.muted, fontWeight: '500', marginTop: 5 },
-    noFilter: { fontSize: 12.5, color: t.muted, fontStyle: 'italic', marginTop: 6 },
+    stageReplaced: { fontSize: t.uit(12.5), color: t.muted, fontWeight: '500', marginTop: 5 },
+    stageStock: { fontSize: t.uit(12.5), color: t.muted, fontWeight: '500', marginTop: 5 },
+    noFilter: { fontSize: t.uit(12.5), color: t.muted, fontStyle: 'italic', marginTop: 6 },
 
     markBtn: { marginTop: 22, marginHorizontal: 16, backgroundColor: t.tabIdleBg, padding: 14, borderRadius: t.radius.btn, alignItems: 'center' },
     markBtnNotesTop: { marginTop: 14 },
     markBtnPinned: { marginTop: 0 },
-    markBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    markBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     // Pinned footer bar (opaque so content scrolls behind it cleanly).
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: t.bg, paddingHorizontal: 18, paddingTop: 10 },

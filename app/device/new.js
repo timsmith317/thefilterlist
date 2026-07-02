@@ -134,7 +134,7 @@ export default function NewDevice() {
       </View>
 
       <KeyboardAwareScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingBottom: 40 }}
         bottomOffset={20}
         keyboardShouldPersistTaps="handled"
       >
@@ -256,41 +256,41 @@ export default function NewDevice() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 6 },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingTop: 22, paddingBottom: 6 },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15), paddingLeft: 16 },
+    title: { ...t.type.title, fontSize: t.uit(26), color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
-    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
+    input: { height: t.ui(50), paddingHorizontal: t.ui(13), borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
     notesInput: {
       padding: 13, borderRadius: 10, borderWidth: 1.5,
-      borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16,
-      minHeight: 110, textAlignVertical: 'top',
+      borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16),
+      minHeight: t.ui(110), textAlignVertical: 'top',
     },
     typeRow: { flexDirection: 'row', gap: 8 },
     chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
     chipOn: { backgroundColor: t.tabIdleBg },
-    chipTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    chipTxt: { fontSize: t.uit(13), fontWeight: '600', color: t.inkSoft },
     chipTxtOn: { color: t.ink, fontWeight: '700' },
     pickerRow: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5,
+      height: t.ui(50), paddingHorizontal: t.ui(13), borderRadius: 10, borderWidth: 1.5,
       borderColor: t.line, backgroundColor: t.card,
     },
-    pickerValue: { fontSize: 16, color: t.ink, flex: 1, marginRight: 8 },
+    pickerValue: { fontSize: t.uit(16), color: t.ink, flex: 1, marginRight: 8 },
     pickerPlaceholder: { color: t.muted },
-    chev: { fontSize: 20, lineHeight: 22, color: t.muted },
+    chev: { fontSize: t.uit(20), lineHeight: 22, color: t.muted },
     nameRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
     iconLabel: { paddingLeft: 0, textAlign: 'center' },
     // Icon box border matches the index-page icon chips (t.iconBorder +
     // t.radius.chip), not the lighter t.line of the text fields beside it.
-    iconBox: { width: 50, height: 50, borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
+    iconBox: { width: t.ui(50), height: t.ui(50), borderRadius: t.radius.chip, backgroundColor: t.iconBg, borderWidth: 1.5, borderColor: t.iconBorder, alignItems: 'center', justifyContent: 'center' },
     filtersBox: { marginTop: 10, backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
     filterRow: { paddingVertical: 12 },
     filterRowDivider: { borderTopWidth: 1, borderTopColor: t.line },
-    filterName: { fontSize: 15, fontWeight: '700', color: t.ink },
-    filterSub: { fontSize: 12.5, color: t.muted, marginTop: 3 },
-    hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
+    filterName: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
+    filterSub: { fontSize: t.uit(12.5), color: t.muted, marginTop: 3 },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 10, paddingLeft: 13 },
   });
 }

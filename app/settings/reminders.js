@@ -8,6 +8,7 @@
 // shape can support multiple later without a migration.
 
 import React, { useState, useCallback } from 'react';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 import {
   View, Text, Pressable, StyleSheet, ScrollView, Switch,
 } from 'react-native';
@@ -46,6 +47,7 @@ function dayLabel(n) {
 
 export default function RemindersSettings() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const [data, setData] = useState(null);
   const [perm, setPerm] = useState({ granted: false, canAsk: true });
@@ -127,7 +129,7 @@ export default function RemindersSettings() {
         <View />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <ScrollView scrollsToTop={scrollsToTop} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
         <Text style={s.title}>Reminders</Text>
         <Text style={s.sub}>Get notified before devices are due.</Text>
 
@@ -229,25 +231,25 @@ function makeStyles(t) {
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
 
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    title: { fontSize: t.uit(26), fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
 
     banner: {
       marginTop: 18, padding: 14, borderRadius: 12,
       backgroundColor: t.status.amb.pillBg, borderWidth: 1, borderColor: t.line,
     },
-    bannerTitle: { fontSize: 14, fontWeight: '700', color: t.status.amb.pillInk, marginBottom: 4 },
-    bannerBody:  { fontSize: 13, color: t.ink, lineHeight: 18 },
+    bannerTitle: { fontSize: t.uit(14), fontWeight: '700', color: t.status.amb.pillInk, marginBottom: 4 },
+    bannerBody:  { fontSize: t.uit(13), color: t.ink, lineHeight: 18 },
     bannerBtn:   { marginTop: 10, alignSelf: 'flex-start', backgroundColor: t.bg, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: t.line },
-    bannerBtnTxt:{ fontSize: 13, fontWeight: '700', color: t.ink },
+    bannerBtnTxt:{ fontSize: t.uit(13), fontWeight: '700', color: t.ink },
 
     toggleRow: {
       flexDirection: 'row', alignItems: 'center', gap: 12,
       paddingVertical: 14, paddingHorizontal: 16, marginTop: 22,
       backgroundColor: t.card, borderRadius: 10, borderWidth: 1, borderColor: t.line,
     },
-    toggleLabel: { fontSize: 15, fontWeight: '700', color: t.ink },
-    toggleSub: { fontSize: 12, color: t.muted, marginTop: 2 },
+    toggleLabel: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
+    toggleSub: { fontSize: t.uit(12), color: t.muted, marginTop: 2 },
 
     label: {
       ...t.type.kicker, color: t.muted, textTransform: 'uppercase',
@@ -258,11 +260,11 @@ function makeStyles(t) {
       paddingHorizontal: 13, paddingVertical: 13, borderRadius: 10,
       borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
     },
-    rowValue: { fontSize: 16, color: t.ink },
+    rowValue: { fontSize: t.uit(16), color: t.ink },
     rowPlaceholder: { color: t.muted },
     rowDim: { opacity: 0.5 },
-    chev: { fontSize: 22, color: t.muted },
+    chev: { fontSize: t.uit(22), color: t.muted },
 
-    hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 13 },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 8, paddingLeft: 13 },
   });
 }

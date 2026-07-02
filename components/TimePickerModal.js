@@ -130,8 +130,8 @@ function makeStyles(t) {
       paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8,
       borderBottomWidth: 1, borderBottomColor: t.line,
     },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    title: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
     donePill: {
       backgroundColor: t.tabIdleBg,
       paddingHorizontal: 14,
@@ -140,7 +140,7 @@ function makeStyles(t) {
     },
     doneTxt: {
       color: t.inkSoft,
-      fontSize: 14,
+      fontSize: t.uit(14),
       fontWeight: '600',
     },
     pickerCenter: {

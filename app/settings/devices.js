@@ -18,9 +18,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../theme/theme';
 import { BackButton } from '../../components/HeaderBits';
 import { loadData, statusOf } from '../../data/store';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 export default function DevicesInventory() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
@@ -64,6 +66,7 @@ export default function DevicesInventory() {
       </View>
 
       <ScrollView
+        scrollsToTop={scrollsToTop}
         style={s.scrollView}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setContentH(h)}
@@ -136,8 +139,8 @@ function makeStyles(t) {
     scroll: { paddingHorizontal: 18, paddingBottom: 40 },
     scrollView: { flex: 1 },
 
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, lineHeight: 18 },
+    title: { fontSize: t.uit(26), fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16, lineHeight: 18 },
 
     card: {
       flexDirection: 'row', alignItems: 'center',
@@ -147,13 +150,13 @@ function makeStyles(t) {
       marginBottom: 10,
     },
     cardPressed: { backgroundColor: t.tabIdleBg },
-    cardName: { fontSize: 16, fontWeight: '700', color: t.ink },
-    cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
+    cardName: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
+    cardMeta: { fontSize: t.uit(13), color: t.muted, marginTop: 3 },
 
     statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginLeft: 8 },
-    statusPillTxt: { fontSize: 11, fontWeight: '700' },
+    statusPillTxt: { fontSize: t.uit(11), fontWeight: '700' },
 
-    chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
+    chev: { fontSize: t.uit(22), color: t.muted, paddingLeft: 8 },
 
     // Matches the Add buttons on the other settings screens.
     addBtn: {
@@ -163,7 +166,7 @@ function makeStyles(t) {
       alignItems: 'center',
     },
     addBtnInline: { marginTop: 6 },
-    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    addBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     // Pinned footer bar (opaque so the list scrolls behind it cleanly).
     footer: {

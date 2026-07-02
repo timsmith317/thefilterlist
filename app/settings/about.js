@@ -344,12 +344,12 @@ function makeStyles(t) {
       marginBottom: 14,
     },
     appName: {
-      fontSize: 22, fontWeight: '800', letterSpacing: 0.3,
-      color: t.brand || t.ink,
+      fontSize: t.uit(22), fontWeight: '800', letterSpacing: 0.3,
+      color: t.ink,
     },
-    version: { fontSize: 13, color: t.muted, marginTop: 4 },
+    version: { fontSize: t.uit(13), color: t.muted, marginTop: 4 },
     tagline: {
-      fontSize: 15, color: t.inkSoft, textAlign: 'center', lineHeight: 21,
+      fontSize: t.uit(15), color: t.inkSoft, textAlign: 'center', lineHeight: 21,
       paddingHorizontal: 12, marginTop: 8,
     },
     spacer: { flex: 1, minHeight: 20 },
@@ -365,10 +365,10 @@ function makeStyles(t) {
       marginBottom: 8,
     },
     linkRowPressed: { backgroundColor: t.tabIdleBg },
-    linkTxt: { fontSize: 15, fontWeight: '600', color: t.ink },
-    linkChev: { fontSize: 22, color: t.muted },
+    linkTxt: { fontSize: t.uit(15), fontWeight: '600', color: t.ink },
+    linkChev: { fontSize: t.uit(22), color: t.muted },
     footer: {
-      fontSize: 12, color: t.muted, textAlign: 'center', marginTop: 16,
+      fontSize: t.uit(12), color: t.muted, textAlign: 'center', marginTop: 16,
     },
   });
 }

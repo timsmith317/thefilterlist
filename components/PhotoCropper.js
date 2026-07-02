@@ -163,6 +163,6 @@ function makeStyles(t) {
     },
 
     hint: { alignItems: 'center', paddingVertical: 16 },
-    hintTxt: { color: t.muted, fontSize: 13, fontWeight: '600' },
+    hintTxt: { color: t.muted, fontSize: t.uit(13), fontWeight: '600' },
   });
 }

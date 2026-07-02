@@ -23,7 +23,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Pressable, Modal, StyleSheet, Platform,
-  Animated, Easing,
+  Animated, Easing, useWindowDimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../theme/theme';
@@ -38,6 +38,13 @@ const CLOSE_DURATION = 220;
 export default function DatePickerModal({ visible, initialDate, maximumDate, title = 'Pick a date', onCancel, onConfirm }) {
   const t = useTheme();
   const s = makeStyles(t);
+  const { width: winW } = useWindowDimensions();
+  // iPad: center the constrained sheet by computing equal left/right insets
+  // from the live window width (recomputed on rotation, so it stays centered
+  // in both orientations). marginHorizontal:'auto' proved unreliable on an
+  // absolute element, so we set explicit insets instead. iPhone: full width.
+  const SHEET_MAX = 460;
+  const sideInset = t.isTablet && winW > SHEET_MAX ? Math.round((winW - SHEET_MAX) / 2) : 0;
   const [date, setDate] = useState(initialDate || new Date());
   const [internalVisible, setInternalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(SLIDE_DISTANCE)).current;
@@ -72,7 +79,7 @@ export default function DatePickerModal({ visible, initialDate, maximumDate, tit
     <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
       <View style={s.modalRoot}>
         <Pressable style={s.backdrop} onPress={onCancel} />
-        <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View style={[s.sheet, { left: sideInset, right: sideInset, transform: [{ translateY: slideAnim }] }]}>
           <View style={s.head}>
             <Pressable onPress={onCancel} hitSlop={10}>
               <Text style={s.cancel}>Cancel</Text>
@@ -117,10 +124,15 @@ function makeStyles(t) {
     // is animated to slide it up on open / down on close.
     sheet: {
       position: 'absolute',
-      left: 0, right: 0, bottom: 0,
+      bottom: t.isTablet ? 24 : 0,
+      // Horizontal position (left/right) is set INLINE from computed insets so
+      // the sheet centers reliably on iPad in both orientations. Width follows
+      // from left+right. iPhone: insets are 0 -> full width.
       backgroundColor: t.bg,
       borderTopLeftRadius: 18,
       borderTopRightRadius: 18,
+      borderBottomLeftRadius: t.isTablet ? 18 : 0,
+      borderBottomRightRadius: t.isTablet ? 18 : 0,
       paddingBottom: 24,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: -6 },
@@ -132,8 +144,8 @@ function makeStyles(t) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6,
     },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    title: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     donePill: {
       backgroundColor: t.tabIdleBg,
@@ -144,7 +156,7 @@ function makeStyles(t) {
     // Bold + full black to match the app's pill labels.
     doneTxt: {
       color: t.ink,
-      fontSize: 14,
+      fontSize: t.uit(14),
       fontWeight: '700',
     },
     pickerCenter: {

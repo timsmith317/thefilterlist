@@ -147,8 +147,8 @@ function makeStyles(t) {
     headSlot: { flex: 1, justifyContent: 'center', alignItems: 'flex-start' },
     headSlotRight: { alignItems: 'flex-end' },
 
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink, textAlign: 'center' },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    title: { fontSize: t.uit(15), fontWeight: '700', color: t.ink, textAlign: 'center' },
 
     // minWidth so the pill barely changes size between "Copy" and "Copied ✓";
     // even if it did, the title no longer depends on it.
@@ -160,12 +160,12 @@ function makeStyles(t) {
       minWidth: 92,
       alignItems: 'center',
     },
-    copyTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    copyTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     // Cap the body height so a long note scrolls instead of growing the sheet
     // past the screen.
     bodyScroll: { maxHeight: 360 },
     bodyContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-    notesText: { color: t.ink, fontSize: 15, lineHeight: 22 },
+    notesText: { color: t.ink, fontSize: t.uit(15), lineHeight: 22 },
   });
 }

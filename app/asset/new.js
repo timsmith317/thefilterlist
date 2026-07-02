@@ -64,7 +64,7 @@ export default function NewAsset() {
       </View>
 
       <KeyboardAwareScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingBottom: 40 }}
         bottomOffset={20}
         keyboardShouldPersistTaps="handled"
       >
@@ -93,13 +93,13 @@ export default function NewAsset() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 6 },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { ...t.type.title, fontSize: 26, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingTop: 22, paddingBottom: 6 },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15), paddingLeft: 16 },
+    title: { ...t.type.title, fontSize: t.uit(26), color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
-    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
-    hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 13 },
-    errorTxt: { fontSize: 13, color: '#b3261e', marginTop: 12, paddingLeft: 13 },
+    input: { height: t.ui(50), paddingHorizontal: t.ui(13), borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 8, paddingLeft: 13 },
+    errorTxt: { fontSize: t.uit(13), color: '#b3261e', marginTop: 12, paddingLeft: 13 },
   });
 }

@@ -158,8 +158,8 @@ function makeStyles(t) {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
     },
-    flipBtn: { backgroundColor: t.tabIdleBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-    flipTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    flipBtn: { backgroundColor: t.tabIdleBg, paddingHorizontal: t.ui(14), paddingVertical: t.ui(7), borderRadius: 999 },
+    flipTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     // Large, near-full-bleed framed preview.
     area: { flex: 1, paddingHorizontal: 18, paddingTop: 2 },
@@ -178,10 +178,10 @@ function makeStyles(t) {
       flex: 1, borderRadius: 16, borderWidth: 1.5, borderColor: t.iconBorder, backgroundColor: t.card,
       alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28,
     },
-    deniedTitle: { fontSize: 16, fontWeight: '700', color: t.ink, marginBottom: 6 },
-    deniedSub: { fontSize: 13, color: t.muted, textAlign: 'center', marginBottom: 18 },
+    deniedTitle: { fontSize: t.uit(16), fontWeight: '700', color: t.ink, marginBottom: 6 },
+    deniedSub: { fontSize: t.uit(13), color: t.muted, textAlign: 'center', marginBottom: 18 },
     cta: { backgroundColor: t.tabIdleBg, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999 },
-    ctaTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    ctaTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     shutterRow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 22 },
     shutterOuter: {

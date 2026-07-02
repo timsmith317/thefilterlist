@@ -75,8 +75,12 @@ export default function AppearanceSettings() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <BackButton onPress={() => router.back()} />
-        <PillButton label="Save" onPress={onSave} />
+        <View style={{ paddingLeft: t.isTablet ? 16 : 0 }}>
+          <BackButton onPress={() => router.back()} />
+        </View>
+        <View style={{ paddingRight: t.isTablet ? 16 : 0 }}>
+          <PillButton label="Save" onPress={onSave} />
+        </View>
       </View>
 
       <View style={s.body}>
@@ -121,34 +125,43 @@ function makeStyles(t) {
       paddingHorizontal: 18, paddingTop: 0, paddingBottom: 6,
     },
 
-    body: { paddingHorizontal: 18, paddingBottom: 40 },
+    body: {
+      paddingBottom: 40,
+      // iPad: wider inset (matches other settings screens), left-aligned. No
+      // centering cap — the buttons are full-width blocks, which balances the
+      // left-aligned layout (same fix as Backup & Restore).
+      paddingHorizontal: t.isTablet ? t.ui(32) : 18,
+    },
 
     title: { ...t.type.screenTitle, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16 },
 
     label: {
       ...t.type.kicker, color: t.muted, textTransform: 'uppercase',
       marginTop: 22, marginBottom: 8, paddingLeft: 13,
     },
 
-    // Backup-screen button footprint: centered, chunky, identical size
-    // regardless of label length. Idle = Restore's white-fill-with-border
-    // look; selected = Backup's grey fill (same as cardPressed). No dark
-    // fill — that's tab/active-pill language, not button language.
-    options: { gap: 12, marginTop: 8 },
+    // iPhone: stacked full-width buttons. iPad: side-by-side row (System |
+    // Light | Dark) so no single button stretches too wide on the big screen.
+    options: t.isTablet
+      ? { flexDirection: 'row', gap: t.ui(12), marginTop: 8 }
+      : { gap: 12, marginTop: 8 },
     optBtn: {
-      alignSelf: 'center',
+      // iPhone stretch = full-width block; iPad each button flexes to share the
+      // row equally.
+      alignSelf: t.isTablet ? 'auto' : 'stretch',
+      flex: t.isTablet ? 1 : undefined,
       paddingVertical: 12, paddingHorizontal: 28,
-      minWidth: 200, minHeight: 44,
+      minHeight: 44,
       borderRadius: 10, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.bg,
       alignItems: 'center', justifyContent: 'center',
     },
     optBtnActive: { backgroundColor: t.tabIdleBg },
-    optTxt:       { fontSize: 15, fontWeight: '700', color: t.ink },
+    optTxt:       { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     hint: {
-      fontSize: 12, color: t.muted, textAlign: 'center',
+      fontSize: t.uit(12), color: t.muted, textAlign: 'center',
       marginTop: 20, paddingHorizontal: 24, lineHeight: 17,
     },
   });

@@ -35,6 +35,7 @@ import IntervalField from '../../components/IntervalField';
 import { loadData, saveData, updateFilter, deleteFilter, devicesUsingFilter, isFilterLow, addFilterPhoto, removeFilterPhoto, FILTER_TYPES, MAX_FILTER_PHOTOS, DEFAULT_INTERVAL_DAYS } from '../../data/store';
 import { intervalToDays, daysToInterval, INTERVAL_UNITS } from '../../lib/interval';
 import { pickFromLibrary, saveToPhotos, deleteFile, photoUri } from '../../lib/filterPhotos';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 // "Every 90 days" / "Every 6 months" / "Every 1 year" (singular-aware).
 function verboseInterval(days) {
@@ -47,6 +48,7 @@ function verboseInterval(days) {
 
 export default function FilterDetail() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [data, setData] = useState(null);
@@ -177,7 +179,8 @@ export default function FilterDetail() {
       </View>
 
       <KeyboardAwareScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        scrollsToTop={scrollsToTop}
+        contentContainerStyle={{ paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingBottom: 40 }}
         bottomOffset={20}
         keyboardShouldPersistTaps="handled"
       >
@@ -360,54 +363,60 @@ export default function FilterDetail() {
 function makeStyles(t) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: t.bg },
-    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6 },
+    head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: t.isTablet ? t.ui(32) : 18, paddingTop: 8, paddingBottom: 6 },
 
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16 },
-    titleInput: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16, paddingVertical: 0 },
+    title: { fontSize: t.uit(26), fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16 },
+    titleInput: { fontSize: t.uit(26), fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 0, paddingLeft: 16, paddingVertical: 0 },
 
     lowSlot: { height: 22, marginTop: 2, paddingLeft: 16, justifyContent: 'center' },
 
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 16 },
     // First section sits closer to the title/badge above it.
     firstLabel: { marginTop: 8 },
-    value: { fontSize: 15, fontWeight: '600', color: t.ink, paddingLeft: 16 },
+    value: { fontSize: t.uit(15), fontWeight: '600', color: t.ink, paddingLeft: 16 },
     typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: 16 },
     typeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
     typeChipOn: { backgroundColor: t.tabIdleBg },
-    typeChipTxt: { fontSize: 13, fontWeight: '600', color: t.inkSoft },
+    typeChipTxt: { fontSize: t.uit(13), fontWeight: '600', color: t.inkSoft },
     typeChipTxtOn: { color: t.ink },
-    input: { padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
+    input: { padding: t.ui(13), borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
 
     stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingLeft: 16 },
-    stepBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.tabIdleBg, alignItems: 'center', justifyContent: 'center' },
-    stepTxt: { fontSize: 24, fontWeight: '700', color: t.ink },
-    stepCount: { fontSize: 22, fontWeight: '800', color: t.ink, minWidth: 40, textAlign: 'center' },
+    stepBtn: { width: t.isTablet ? 46 : 44, height: t.isTablet ? 46 : 44, borderRadius: 12, backgroundColor: t.tabIdleBg, alignItems: 'center', justifyContent: 'center' },
+    stepTxt: { fontSize: t.isTablet ? 25 : 24, fontWeight: '700', color: t.ink },
+    stepCount: { fontSize: t.isTablet ? 23 : 22, fontWeight: '800', color: t.ink, minWidth: t.ui(40), textAlign: 'center' },
 
     openLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 13, borderRadius: 10, backgroundColor: t.tabIdleBg },
-    openLinkTxt: { color: t.ink, fontSize: 14, flex: 1, marginRight: 8 },
-    openLinkArrow: { color: t.inkSoft, fontSize: 18, fontWeight: '700' },
+    openLinkTxt: { color: t.ink, fontSize: t.uit(14), flex: 1, marginRight: 8 },
+    openLinkArrow: { color: t.inkSoft, fontSize: t.uit(18), fontWeight: '700' },
 
     lowPill: { alignSelf: 'flex-start', backgroundColor: t.status.amb.pillBg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-    lowPillTxt: { color: t.status.amb.pillInk, fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
+    lowPillTxt: { color: t.status.amb.pillInk, fontSize: t.uit(11.5), fontWeight: '700', textAlign: 'center' },
 
-    hint: { fontSize: 12, color: t.muted, marginTop: 8, paddingLeft: 16 },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 8, paddingLeft: 16 },
 
     // Read-only photo thumbnails (view mode). Match PhotoStrip's filled slot:
     // square, card fill, thin line border, contain so the whole photo shows.
     // Read-only photo thumbnails (view mode), laid out on the same 3-column grid
     // as the edit strip: photos fill from the left, invisible spacers hold the
     // empty columns, so the outer photos align with the fields above.
-    thumbRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    thumb: { width: 96, height: 96, borderRadius: 14, overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
-    thumbSpacer: { width: 96, height: 96 },
+    // View-mode thumbnails. iPhone: space-between grid with spacers holding
+    // positions. iPad: cluster left with a gap (like PhotoStrip) so the first
+    // photo aligns with the PHOTOS label and other content instead of pinning
+    // to the far screen edge. Thumbs scaled for iPad.
+    thumbRow: t.isTablet
+      ? { flexDirection: 'row', justifyContent: 'flex-start', gap: t.ui(48), paddingLeft: 16 }
+      : { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 16 },
+    thumb: { width: t.ui(96), height: t.ui(96), borderRadius: t.ui(14), overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
+    thumbSpacer: t.isTablet ? { width: 0, height: 0 } : { width: 96, height: 96 },
     thumbImg: { width: '100%', height: '100%', resizeMode: 'contain' },
 
     usedBox: { backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
     usedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.line },
-    usedTxt: { fontSize: 14, color: t.ink, fontWeight: '600' },
-    chev: { fontSize: 22, color: t.muted },
+    usedTxt: { fontSize: t.uit(14), color: t.ink, fontWeight: '600' },
+    chev: { fontSize: t.uit(22), color: t.muted },
 
     delBtn: { marginTop: 28, padding: 12, alignItems: 'center' },
-    delTxt: { color: '#dc2626', fontSize: 14 },
+    delTxt: { color: '#dc2626', fontSize: t.uit(14) },
   });
 }

@@ -188,14 +188,14 @@ function makeStyles(t) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6,
     },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 15, fontWeight: '700', color: t.ink },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    title: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
     donePill: { backgroundColor: t.tabIdleBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
     donePillOff: { opacity: 0.4 },
-    doneTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    doneTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
     doneTxtOff: { color: t.muted },
 
-    helper: { color: t.muted, fontSize: 13, paddingHorizontal: 18, paddingBottom: 4 },
+    helper: { color: t.muted, fontSize: t.uit(13), paddingHorizontal: 18, paddingBottom: 4 },
 
     listWrap: { maxHeight: 300 },
     listContent: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 4 },
@@ -207,13 +207,13 @@ function makeStyles(t) {
       alignItems: 'center', justifyContent: 'center', backgroundColor: t.card,
     },
     boxOn: { borderColor: CHECKED_BORDER },
-    check: { color: t.ink, fontSize: 14, fontWeight: '600', lineHeight: 16 },
+    check: { color: t.ink, fontSize: t.uit(14), fontWeight: '600', lineHeight: 16 },
 
     // Name + status pill share the title line; the schedule sub-line gets its
     // own full-width row beneath so it never truncates behind the pill.
     rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-    rowName: { fontSize: 15, fontWeight: '700', color: t.ink, flex: 1, marginRight: 8 },
-    rowSub: { fontSize: 12, color: t.muted, marginTop: 2 },
+    rowName: { fontSize: t.uit(15), fontWeight: '700', color: t.ink, flex: 1, marginRight: 8 },
+    rowSub: { fontSize: t.uit(12), color: t.muted, marginTop: 2 },
 
     pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill },
     pillTxt: { ...t.type.pill },
@@ -223,10 +223,10 @@ function makeStyles(t) {
       marginTop: 6, marginHorizontal: 18, paddingVertical: 14, paddingHorizontal: 14,
       backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: t.radius.btn,
     },
-    dateLabel: { fontSize: 14, fontWeight: '400', color: t.inkSoft },
+    dateLabel: { fontSize: t.uit(14), fontWeight: '400', color: t.inkSoft },
     dateVal: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    dateValTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
-    dateChev: { fontSize: 17, color: t.muted, fontWeight: '700' },
+    dateValTxt: { fontSize: t.uit(14), fontWeight: '700', color: t.ink },
+    dateChev: { fontSize: t.uit(17), color: t.muted, fontWeight: '700' },
 
     pickerCenter: { alignItems: 'center' },
   });

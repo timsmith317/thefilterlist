@@ -121,23 +121,23 @@ function makeStyles(t) {
     },
     headSlot: { flex: 1, justifyContent: 'center', alignItems: 'flex-start' },
     headSlotRight: { alignItems: 'flex-end' },
-    cancel: { color: t.inkSoft, fontSize: 16 },
-    title: { fontSize: 16, fontWeight: '700', color: t.ink, textAlign: 'center' },
+    cancel: { color: t.inkSoft, fontSize: t.uit(16) },
+    title: { fontSize: t.uit(16), fontWeight: '700', color: t.ink, textAlign: 'center' },
     donePill: { backgroundColor: t.tabIdleBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, minWidth: 72, alignItems: 'center' },
-    doneTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    doneTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     scroll: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40 },
     kicker: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginBottom: 8 },
 
-    input: { height: 50, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16 },
+    input: { height: t.ui(50), paddingHorizontal: t.ui(13), borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16) },
 
     fileBtn: { padding: 14, borderRadius: 10, backgroundColor: t.tabIdleBg, alignItems: 'center' },
-    fileBtnTxt: { color: t.ink, fontSize: 15, fontWeight: '700' },
+    fileBtnTxt: { color: t.ink, fontSize: t.uit(15), fontWeight: '700' },
 
     fileChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
-    fileName: { color: t.ink, fontSize: 15, fontWeight: '600', flex: 1, marginRight: 10 },
-    removeX: { color: t.muted, fontSize: 15, fontWeight: '700' },
+    fileName: { color: t.ink, fontSize: t.uit(15), fontWeight: '600', flex: 1, marginRight: 10 },
+    removeX: { color: t.muted, fontSize: t.uit(15), fontWeight: '700' },
 
-    hint: { fontSize: 12, color: t.muted, marginTop: 12 },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 12 },
   });
 }

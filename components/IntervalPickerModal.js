@@ -58,7 +58,7 @@ function Wheel({ data, index, onCommit, width, t }) {
             style={{ height: ITEM_H, alignItems: 'center', justifyContent: 'center' }}
             onPress={() => { setLive(i); scrollTo(i, true); onCommit(i); }}
           >
-            <Text style={{ fontSize: 20, color: i === live ? t.ink : t.muted, fontWeight: i === live ? '700' : '500' }}>
+            <Text style={{ fontSize: t.uit(20), color: i === live ? t.ink : t.muted, fontWeight: i === live ? '700' : '500' }}>
               {label}
             </Text>
           </Pressable>
@@ -157,9 +157,9 @@ function makeStyles(t, bottomInset) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.line, marginBottom: 6,
     },
-    cancel: { color: t.inkSoft, fontSize: 15 },
-    title: { fontSize: 16, fontWeight: '700', color: t.ink },
-    done: { color: t.ink, fontSize: 15, fontWeight: '800' },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
+    title: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
+    done: { color: t.ink, fontSize: t.uit(15), fontWeight: '800' },
     wheels: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   });
 }

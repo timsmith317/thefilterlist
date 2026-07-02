@@ -135,7 +135,13 @@ export default function Picker() {
             <Text style={s.cancel}>Cancel</Text>
           </Pressable>
         ) : (
-          <View style={{ width: 72 }} />
+          // Single (asset) mode: Cancel on the LEFT for consistency with every
+          // other screen (was on the right — the only screen that differed).
+          // No Done in single mode (picking commits immediately), so the RIGHT
+          // slot is an empty spacer to keep the title centered.
+          <Pressable onPress={() => router.back()} hitSlop={10} style={s.leftTap}>
+            <Text style={s.cancel}>Cancel</Text>
+          </Pressable>
         )}
         <Text style={s.title} numberOfLines={1}>{title}</Text>
         {isMulti ? (
@@ -143,9 +149,7 @@ export default function Picker() {
             <Text style={s.doneTxt}>Done</Text>
           </Pressable>
         ) : (
-          <Pressable onPress={() => router.back()} hitSlop={10} style={s.cancelTap}>
-            <Text style={s.cancel}>Cancel</Text>
-          </Pressable>
+          <View style={{ width: 72 }} />
         )}
       </View>
 
@@ -241,12 +245,12 @@ function makeStyles(t) {
       paddingTop: 22,
       paddingBottom: 16,
     },
-    title: { fontSize: 16, fontWeight: '700', color: t.ink, flex: 1, textAlign: 'center' },
+    title: { fontSize: t.uit(16), fontWeight: '700', color: t.ink, flex: 1, textAlign: 'center' },
     leftTap: { width: 72, alignItems: 'flex-start' },
     cancelTap: { width: 72, alignItems: 'flex-end' },
-    cancel: { color: t.inkSoft, fontSize: 15 },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
     donePill: { width: 72, alignItems: 'center', backgroundColor: t.tabIdleBg, paddingVertical: 7, borderRadius: 999 },
-    doneTxt: { color: t.ink, fontSize: 14, fontWeight: '700' },
+    doneTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     searchWrap: { paddingHorizontal: 16, paddingBottom: 14 },
     search: {
@@ -254,7 +258,7 @@ function makeStyles(t) {
       borderRadius: 10,
       paddingHorizontal: 13,
       paddingVertical: 10,
-      fontSize: 15,
+      fontSize: t.uit(15),
       color: t.ink,
     },
 
@@ -268,18 +272,18 @@ function makeStyles(t) {
       borderBottomWidth: 1,
       borderBottomColor: t.line,
     },
-    rowName: { fontSize: 15, color: t.ink, flex: 1 },
+    rowName: { fontSize: t.uit(15), color: t.ink, flex: 1 },
     rowNameOn: { fontWeight: '700' },
-    rowSub: { fontSize: 12, color: t.muted, marginTop: 2 },
-    check: { fontSize: 18, color: t.ink, fontWeight: '700', marginLeft: 8 },
+    rowSub: { fontSize: t.uit(12), color: t.muted, marginTop: 2 },
+    check: { fontSize: t.uit(18), color: t.ink, fontWeight: '700', marginLeft: 8 },
 
     // Multi-select checkbox (white box, soft border when checked, black check).
     box: {
-      width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: t.line,
+      width: t.ui(22), height: t.ui(22), borderRadius: 6, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.card, alignItems: 'center', justifyContent: 'center', marginRight: 12,
     },
     boxOn: { borderColor: '#B0B0B0' },
-    boxCheck: { color: t.ink, fontSize: 13, fontWeight: '600', lineHeight: 15 },
+    boxCheck: { color: t.ink, fontSize: t.uit(13), fontWeight: '600', lineHeight: t.uit(15) },
 
     addBtn: {
       padding: 14,
@@ -288,16 +292,18 @@ function makeStyles(t) {
       alignItems: 'center',
     },
     addBtnInline: { marginTop: 14 },
-    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    addBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     footer: {
       backgroundColor: t.bg,
       paddingHorizontal: 16,
       paddingTop: 10,
-      paddingBottom: 8,
+      // More breathing room below the + Add button. Scaled on iPad so it's
+      // proportionally roomier (was 8 — too tight against the bottom edge).
+      paddingBottom: t.ui(20),
     },
 
     empty: { paddingVertical: 30, alignItems: 'center' },
-    emptyTxt: { fontSize: 14, color: t.muted, fontStyle: 'italic' },
+    emptyTxt: { fontSize: t.uit(14), color: t.muted, fontStyle: 'italic' },
   });
 }

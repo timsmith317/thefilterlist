@@ -168,7 +168,7 @@ function makeStyles(t) {
       flexDirection: 'row', justifyContent: 'flex-end',
       paddingHorizontal: 20, paddingTop: 12, minHeight: 28,
     },
-    skip: { fontSize: 17, fontWeight: '600', color: t.muted },
+    skip: { fontSize: t.uit(17), fontWeight: '600', color: t.muted },
 
     slide: {
       flex: 1, alignItems: 'center', justifyContent: 'center',
@@ -186,11 +186,11 @@ function makeStyles(t) {
       marginBottom: 32,
     },
     slideTitle: {
-      fontSize: 24, fontWeight: '800', color: t.ink,
+      fontSize: t.uit(24), fontWeight: '800', color: t.ink,
       textAlign: 'center', marginBottom: 14, letterSpacing: -0.3,
     },
     slideBody: {
-      fontSize: 16, color: t.inkSoft, textAlign: 'center', lineHeight: 24,
+      fontSize: t.uit(16), color: t.inkSoft, textAlign: 'center', lineHeight: 24,
       maxWidth: 340,
     },
 
@@ -208,6 +208,6 @@ function makeStyles(t) {
       paddingVertical: 15, borderRadius: 12, backgroundColor: t.tabIdleBg,
       alignItems: 'center', justifyContent: 'center', minHeight: 52,
     },
-    ctaTxt: { fontSize: 16, fontWeight: '700', color: t.ink },
+    ctaTxt: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
   });
 }

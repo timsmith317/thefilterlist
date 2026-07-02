@@ -40,6 +40,7 @@ import {
   pickBackupFile, readAndValidateBackup, applyRestore,
 } from '../../lib/backup';
 import { loadData, hasStarterData, clearStarterData } from '../../data/store';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 
 function formatDate(iso) {
   if (!iso) return 'Unknown';
@@ -56,6 +57,7 @@ function formatDate(iso) {
 
 export default function BackupSettings() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -182,54 +184,62 @@ export default function BackupSettings() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
-        <BackButton onPress={() => router.back()} />
+        <View style={{ paddingLeft: t.isTablet ? 16 : 0 }}>
+          <BackButton onPress={() => router.back()} />
+        </View>
         <View />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView scrollsToTop={scrollsToTop} contentContainerStyle={s.scroll}>
         <Text style={s.title}>Backup & Restore</Text>
         <Text style={s.sub}>
           Export your data, or restore from a previous backup.
         </Text>
 
-        {/* BACKUP */}
-        <Text style={s.label}>BACKUP</Text>
-        <View style={s.card}>
-          <Text style={s.cardBody}>
-            Creates a single file with your assets, devices, filters,
-            reminders, and reference photos. Save it to Files, AirDrop it,
-            or send it to yourself for safekeeping.
-          </Text>
-          <Pressable
-            style={[s.actionBtnPrimary, exporting && s.btnDim]}
-            onPress={onExport}
-            disabled={exporting}
-          >
-            {exporting
-              ? <ActivityIndicator color={t.ink} />
-              : <Text style={s.actionBtnPrimaryTxt}>Backup</Text>}
-          </Pressable>
-        </View>
+        {/* BACKUP + RESTORE — stacked on iPhone, side-by-side on iPad. Each
+            label+card is a section; on iPad the two sections sit in a row. */}
+        <View style={s.sectionsRow}>
+          <View style={s.section}>
+            <Text style={s.label}>BACKUP</Text>
+            <View style={s.card}>
+              <Text style={s.cardBody}>
+                Creates a single file with your assets, devices, filters,
+                reminders, and reference photos. Save it to Files, AirDrop it,
+                or send it to yourself for safekeeping.
+              </Text>
+              <Pressable
+                style={[s.actionBtnPrimary, exporting && s.btnDim]}
+                onPress={onExport}
+                disabled={exporting}
+              >
+                {exporting
+                  ? <ActivityIndicator color={t.ink} />
+                  : <Text style={s.actionBtnPrimaryTxt}>Backup</Text>}
+              </Pressable>
+            </View>
+          </View>
 
-        {/* RESTORE */}
-        <Text style={s.label}>RESTORE</Text>
-        <View style={s.card}>
-          <Text style={s.cardBody}>
-            Replace all current data with a previous backup. Useful for a
-            new device or after reinstalling.
-          </Text>
-          {/* The "replace everything" warning is intentionally NOT here —
-              it fires at the moment of action via the preview modal and
-              the destructive Alert in onConfirmRestore. */}
-          <Pressable
-            style={[s.actionBtnSecondary, picking && s.btnDim]}
-            onPress={onPickAndPreview}
-            disabled={picking}
-          >
-            {picking
-              ? <ActivityIndicator color={t.ink} />
-              : <Text style={s.actionBtnSecondaryTxt}>Restore</Text>}
-          </Pressable>
+          <View style={s.section}>
+            <Text style={s.label}>RESTORE</Text>
+            <View style={s.card}>
+              <Text style={s.cardBody}>
+                Replace all current data with a previous backup. Useful for a
+                new device or after reinstalling.
+              </Text>
+              {/* The "replace everything" warning is intentionally NOT here —
+                  it fires at the moment of action via the preview modal and
+                  the destructive Alert in onConfirmRestore. */}
+              <Pressable
+                style={[s.actionBtnSecondary, picking && s.btnDim]}
+                onPress={onPickAndPreview}
+                disabled={picking}
+              >
+                {picking
+                  ? <ActivityIndicator color={t.ink} />
+                  : <Text style={s.actionBtnSecondaryTxt}>Restore</Text>}
+              </Pressable>
+            </View>
+          </View>
         </View>
 
         {/* DELETE SAMPLE DATA — only while untouched seed items remain.
@@ -324,10 +334,24 @@ function makeStyles(t) {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingHorizontal: 18, paddingTop: 8, paddingBottom: 6,
     },
-    scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+    scroll: {
+      paddingHorizontal: 18, paddingBottom: 40,
+      // iPad: wider inset (matches other settings screens), left-aligned — no
+      // centering. The Backup/Restore sections go side-by-side (see sectionsRow).
+      paddingHorizontal: t.isTablet ? t.ui(32) : 18,
+    },
+
+    // iPhone: sections stack (column). iPad: side-by-side (row), stretched to
+    // equal height so both cards match and their buttons align.
+    sectionsRow: t.isTablet
+      ? { flexDirection: 'row', gap: t.ui(18), alignItems: 'stretch' }
+      : { flexDirection: 'column' },
+    // On iPad each section takes equal width AND stretches full height; on
+    // iPhone full width, natural height.
+    section: t.isTablet ? { flex: 1 } : { width: '100%' },
 
     title: { ...t.type.screenTitle, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
 
     label: {
       ...t.type.kicker, color: t.muted, textTransform: 'uppercase',
@@ -339,37 +363,40 @@ function makeStyles(t) {
       borderRadius: 12, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.card,
       marginBottom: 18,
+      // iPad: fill the section's (stretched) height so both cards match and
+      // their buttons align at the bottom (paired with marginTop:'auto' on btn).
+      ...(t.isTablet ? { flex: 1 } : {}),
     },
-    cardBody: { fontSize: 13, color: t.ink, lineHeight: 19, textAlign: 'center' },
-    cardWarn: { fontSize: 13, color: t.muted, marginTop: 10, fontStyle: 'italic', lineHeight: 18 },
+    // Left-aligned body text (was centered when the whole screen was centered).
+    cardBody: { fontSize: t.uit(13), color: t.ink, lineHeight: 19, textAlign: 'left' },
+    cardWarn: { fontSize: t.uit(13), color: t.muted, marginTop: 10, fontStyle: 'italic', lineHeight: 18 },
 
-    // Narrow, centered action buttons. alignSelf:'center' takes them out
-    // of full-width stretch; minWidth: 200 + identical paddings give both
-    // buttons the same chunky pill footprint regardless of label length.
-    // Backup is now grey-filled + bold black to match the app's standard
-    // buttons (Mark Replaced, Add, etc.).
+    // Full-width action buttons within their card (no longer centered pills) —
+    // reads as an intentional block, which is what balances the left-aligned
+    // layout. Backup = grey-filled bold (app's standard button).
     actionBtnPrimary: {
-      marginTop: 28,
-      alignSelf: 'center',
+      marginTop: 16,
+      alignSelf: 'stretch',
       paddingVertical: 12, paddingHorizontal: 28,
-      minWidth: 200,
       borderRadius: 10, backgroundColor: t.tabIdleBg,
       alignItems: 'center', minHeight: 44, justifyContent: 'center',
     },
-    actionBtnPrimaryTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    actionBtnPrimaryTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
-    // Restore kept as the white-outline secondary for primary/secondary
-    // distinction next to Backup.
+    // Restore = white-outline secondary, also full-width. On iPad its card is
+    // stretched to match the taller Backup card, so we push this button to the
+    // bottom (marginTop:'auto') to align it with the Backup button. Backup's
+    // button keeps natural position (its text drives the height, so it's already
+    // near the bottom). iPhone: normal fixed spacing.
     actionBtnSecondary: {
-      marginTop: 28,
-      alignSelf: 'center',
+      marginTop: t.isTablet ? 'auto' : 16,
+      alignSelf: 'stretch',
       paddingVertical: 12, paddingHorizontal: 28,
-      minWidth: 200,
       borderRadius: 10, borderWidth: 1.5, borderColor: t.line,
       backgroundColor: t.bg,
       alignItems: 'center', minHeight: 44, justifyContent: 'center',
     },
-    actionBtnSecondaryTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    actionBtnSecondaryTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     btnDim: { opacity: 0.6 },
 
@@ -381,9 +408,9 @@ function makeStyles(t) {
       paddingVertical: 10, paddingHorizontal: 22,
       minHeight: 44, alignItems: 'center', justifyContent: 'center',
     },
-    sampleBtnTxt: { fontSize: 15, fontWeight: '700', color: t.status.red.pillInk },
+    sampleBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.status.red.pillInk },
     sampleHint: {
-      fontSize: 12, color: t.muted, textAlign: 'center',
+      fontSize: t.uit(12), color: t.muted, textAlign: 'center',
       marginTop: 2, paddingHorizontal: 24, lineHeight: 17,
     },
 
@@ -400,8 +427,8 @@ function makeStyles(t) {
       shadowRadius: 16,
       elevation: 10,
     },
-    dialogTitle: { fontSize: 18, fontWeight: '700', color: t.ink, marginBottom: 4 },
-    dialogSub: { fontSize: 12, color: t.muted, marginBottom: 14 },
+    dialogTitle: { fontSize: t.uit(18), fontWeight: '700', color: t.ink, marginBottom: 4 },
+    dialogSub: { fontSize: t.uit(12), color: t.muted, marginBottom: 14 },
 
     statsList: {
       borderTopWidth: 1, borderTopColor: t.line,
@@ -411,21 +438,21 @@ function makeStyles(t) {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       paddingVertical: 6,
     },
-    statLabel: { fontSize: 14, color: t.inkSoft },
-    statValue: { fontSize: 14, fontWeight: '700', color: t.ink },
+    statLabel: { fontSize: t.uit(14), color: t.inkSoft },
+    statValue: { fontSize: t.uit(14), fontWeight: '700', color: t.ink },
 
     dialogActions: {
       flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center',
       gap: 12, marginTop: 18,
     },
     btnSecondary: { paddingVertical: 10, paddingHorizontal: 18 },
-    btnSecondaryTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
+    btnSecondaryTxt: { fontSize: t.uit(14), fontWeight: '600', color: t.inkSoft },
     // Grey fill + bold black to match the app's standard buttons.
     btnPrimary: {
       paddingVertical: 10, paddingHorizontal: 22,
       borderRadius: 8, backgroundColor: t.tabIdleBg,
       minWidth: 88, alignItems: 'center', justifyContent: 'center',
     },
-    btnPrimaryTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
+    btnPrimaryTxt: { fontSize: t.uit(14), fontWeight: '700', color: t.ink },
   });
 }

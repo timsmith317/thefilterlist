@@ -42,6 +42,7 @@ const unitIdxOfSlot = (slot) => (((slot - REAL0) % N) + N) % N;
 
 // Unit roller (module-level so it doesn't remount each render).
 function UnitRoller({ unitKey, onPick, t }) {
+  const s_roller = makeRollerStyles(t);
   const ref = useRef(null);
   const lock = useRef(false);     // true while a programmatic spin is settling
   const timer = useRef(null);
@@ -122,12 +123,13 @@ function UnitRoller({ unitKey, onPick, t }) {
   );
 }
 
-const s_roller = StyleSheet.create({
+const makeRollerStyles = (t) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   item: { height: FIELD_H, alignItems: 'center', justifyContent: 'center' },
-  unit: { fontSize: 16, fontWeight: '500' },
+  // Unit roller bumped 16 -> 20 to match IntervalField's roller.
+  unit: { fontSize: t.uit(16), fontWeight: '500' },
   chevs: { marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
-  chev: { fontSize: 20, lineHeight: 13, fontWeight: '600' },
+  chev: { fontSize: t.uit(18), lineHeight: t.uit(15), fontWeight: '600' },
 });
 
 export default function StagesEditor({
@@ -230,26 +232,26 @@ export default function StagesEditor({
 function makeStyles(t) {
   return StyleSheet.create({
     label: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', marginTop: 22, marginBottom: 8, paddingLeft: 13 },
-    miniLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', fontSize: 11, marginTop: 14, marginBottom: 6, paddingLeft: 13 },
+    miniLabel: { ...t.type.kicker, color: t.muted, textTransform: 'uppercase', fontSize: t.uit(11), marginTop: 14, marginBottom: 6, paddingLeft: 13 },
 
     // Number field fills the row; unit roller + chevrons sit at the right edge.
     intervalRow: { flexDirection: 'row', alignItems: 'center' },
-    numInput: { flex: 1, height: FIELD_H, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: 16, marginRight: 14 },
+    numInput: { flex: 1, height: FIELD_H, paddingHorizontal: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, color: t.ink, fontSize: t.uit(16), marginRight: 14 },
 
     pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 13, borderRadius: 10, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card },
-    pickerValue: { fontSize: 16, color: t.ink, flex: 1, marginRight: 8 },
+    pickerValue: { fontSize: t.uit(16), color: t.ink, flex: 1, marginRight: 8 },
     pickerPlaceholder: { color: t.muted },
-    chev: { fontSize: 22, color: t.muted },
-    hint: { fontSize: 12, color: t.muted, marginTop: 10, paddingLeft: 13 },
+    chev: { fontSize: t.uit(22), color: t.muted },
+    hint: { fontSize: t.uit(12), color: t.muted, marginTop: 10, paddingLeft: 13 },
 
     // Multi-stage: each stage a block, dividers between.
     stageBlock: { marginTop: 4 },
     stageDivider: { marginTop: 18, paddingTop: 18, borderTopWidth: 1, borderTopColor: t.line },
     stageHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 13, marginBottom: 2 },
-    stageTitle: { fontSize: 15, fontWeight: '800', color: t.ink },
-    remove: { fontSize: 13, color: '#dc2626', fontWeight: '600' },
+    stageTitle: { fontSize: t.uit(15), fontWeight: '800', color: t.ink },
+    remove: { fontSize: t.uit(13), color: '#dc2626', fontWeight: '600' },
 
     addStage: { marginTop: 16, padding: 13, borderRadius: t.radius.btn, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card, alignItems: 'center' },
-    addStageTxt: { fontSize: 14, fontWeight: '700', color: t.ink },
+    addStageTxt: { fontSize: t.uit(14), fontWeight: '700', color: t.ink },
   });
 }

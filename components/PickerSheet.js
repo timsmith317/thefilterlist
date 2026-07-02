@@ -247,9 +247,9 @@ function makeStyles(t) {
       paddingTop: 10,
       paddingBottom: 14,
     },
-    title: { fontSize: 16, fontWeight: '700', color: t.ink, flex: 1, textAlign: 'center' },
+    title: { fontSize: t.uit(16), fontWeight: '700', color: t.ink, flex: 1, textAlign: 'center' },
     cancelTap: { width: 64, alignItems: 'flex-end' },
-    cancel: { color: t.inkSoft, fontSize: 15 },
+    cancel: { color: t.inkSoft, fontSize: t.uit(15) },
 
     searchWrap: { paddingHorizontal: 16, paddingBottom: 14 },
     search: {
@@ -257,7 +257,7 @@ function makeStyles(t) {
       borderRadius: 10,
       paddingHorizontal: 13,
       paddingVertical: 10,
-      fontSize: 15,
+      fontSize: t.uit(15),
       color: t.ink,
     },
 
@@ -271,10 +271,10 @@ function makeStyles(t) {
       borderBottomWidth: 1,
       borderBottomColor: t.line,
     },
-    rowName: { fontSize: 15, color: t.ink, flex: 1 },
+    rowName: { fontSize: t.uit(15), color: t.ink, flex: 1 },
     rowNameOn: { fontWeight: '700' },
-    rowSub: { fontSize: 12, color: t.muted, marginTop: 2 },
-    check: { fontSize: 18, color: t.ink, fontWeight: '700', marginLeft: 8 },
+    rowSub: { fontSize: t.uit(12), color: t.muted, marginTop: 2 },
+    check: { fontSize: t.uit(18), color: t.ink, fontWeight: '700', marginLeft: 8 },
 
     addBtn: {
       padding: 14,
@@ -283,7 +283,7 @@ function makeStyles(t) {
       alignItems: 'center',
     },
     addBtnInline: { marginTop: 14 },
-    addBtnTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    addBtnTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     footer: {
       backgroundColor: t.bg,
@@ -293,6 +293,6 @@ function makeStyles(t) {
     },
 
     empty: { paddingVertical: 30, alignItems: 'center' },
-    emptyTxt: { fontSize: 14, color: t.muted, fontStyle: 'italic' },
+    emptyTxt: { fontSize: t.uit(14), color: t.muted, fontStyle: 'italic' },
   });
 }

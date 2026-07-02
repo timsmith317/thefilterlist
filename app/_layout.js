@@ -2,6 +2,7 @@
 
 import { Stack } from 'expo-router';
 import { LogBox } from 'react-native';
+import { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useTheme } from '../theme/theme';
@@ -14,15 +15,20 @@ LogBox.ignoreLogs(['InteractionManager has been deprecated']);
 
 export default function RootLayout() {
   const t = useTheme();
+  // Memoize screenOptions so a root re-render (e.g. iPad landscape transition,
+  // where useTheme's useWindowDimensions re-fires) doesn't pass a brand-new
+  // options object to <Stack>. A new screenOptions object was causing React
+  // Navigation to REMOUNT screens on focus (confirmed via mount/unmount logs) —
+  // which reset Settings' scroll to top. Keyed only on the bg color that's
+  // actually used inside.
+  const screenOptions = useMemo(() => ({
+    headerShown: false,
+    contentStyle: { backgroundColor: t.bg },
+  }), [t.bg]);
   return (
     <SafeAreaProvider>
       <KeyboardProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: t.bg },
-          }}
-        >
+        <Stack screenOptions={screenOptions}>
           <Stack.Screen name="index" />
           <Stack.Screen name="device/[id]" options={{ presentation: 'card' }} />
           <Stack.Screen name="device/new" options={{ presentation: 'modal' }} />

@@ -30,6 +30,7 @@ const ROLL_DATA = [INTERVAL_UNITS[N - 1], ...INTERVAL_UNITS, INTERVAL_UNITS[0]];
 const unitIdxOfSlot = (slot) => (((slot - REAL0) % N) + N) % N;
 
 function UnitRoller({ unitKey, onPick, t }) {
+  const s_roller = makeRollerStyles(t);
   const ref = useRef(null);
   const lock = useRef(false);
   const timer = useRef(null);
@@ -102,12 +103,14 @@ function UnitRoller({ unitKey, onPick, t }) {
   );
 }
 
-const s_roller = StyleSheet.create({
+const makeRollerStyles = (t) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   item: { height: FIELD_H, alignItems: 'center', justifyContent: 'center' },
-  unit: { fontSize: 16, fontWeight: '500' },
+  // Unit roller text bumped from 16 -> 20 for more presence (matches the
+  // prominence of the TYPE pills on the same form).
+  unit: { fontSize: t.uit(16), fontWeight: '500' },
   chevs: { marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
-  chev: { fontSize: 20, lineHeight: 13, fontWeight: '600' },
+  chev: { fontSize: t.uit(18), lineHeight: t.uit(15), fontWeight: '600' },
 });
 
 export default function IntervalField({ value, unit, onChangeValue, onChangeUnit }) {
@@ -134,7 +137,7 @@ function makeStyles(t) {
     numInput: {
       flex: 1, height: FIELD_H, paddingHorizontal: 13, borderRadius: 10,
       borderWidth: 1.5, borderColor: t.line, backgroundColor: t.card,
-      color: t.ink, fontSize: 16, marginRight: 14,
+      color: t.ink, fontSize: t.uit(16), marginRight: 14,
     },
   });
 }

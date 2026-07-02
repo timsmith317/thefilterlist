@@ -56,19 +56,19 @@ function makeStyles(t) {
   return StyleSheet.create({
     back: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
     // Chevron-to-text margin: -2 gives a comfortable but tight gap.
-    backTxt: { color: t.ink, fontSize: 16, fontWeight: '600', marginLeft: -2 },
+    backTxt: { color: t.ink, fontSize: t.uit(16), fontWeight: '600', marginLeft: -2 },
     // Matches the Settings pill metrics on Due Soon for a unified look
     // across the app's header pills (Edit, Cancel, +Add, Save, Settings).
     pill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
+      gap: t.ui(7),
+      paddingHorizontal: t.ui(14),
+      paddingVertical: t.ui(7),
       borderRadius: 999,
       backgroundColor: t.tabIdleBg,
     },
-    pillTxt: { fontSize: 14, fontWeight: '600', color: t.inkSoft },
+    pillTxt: { fontSize: t.uit(14), fontWeight: '600', color: t.inkSoft },
     // Applied when bold / dark (global switch or per-instance prop).
     pillTxtBold: { fontWeight: '700' },
     pillTxtInk: { color: t.ink },

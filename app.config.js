@@ -52,7 +52,14 @@ module.exports = {
     name: getAppName(),
     slug: 'thefilterlist',
     version: '1.0.0',
-    orientation: 'portrait',
+    // 'default' allows all orientations (portrait + landscape). Required for a
+    // proper iPad experience — iPad users expect landscape. On iPhone this also
+    // enables landscape; if you want to KEEP iPhone portrait-locked while
+    // allowing iPad both ways, that's not a single app.config flag — it's done
+    // per-screen (or via a native orientation lock that exempts iPad). For now
+    // 'default' unlocks everything; we'll decide iPhone-landscape policy during
+    // the audit (many screens may look fine, some may need portrait-locking).
+    orientation: 'default',
     icon: './assets/icon.png',
     scheme: 'thefilterlist',
     userInterfaceStyle: 'automatic',
@@ -63,7 +70,7 @@ module.exports = {
       backgroundColor: '#ffffff',
     },
     ios: {
-      supportsTablet: false,
+      supportsTablet: true,
       bundleIdentifier: getBundleId(),
       // We set the permission strings here directly (not via plugins), so the
       // generated plist carries exactly these three keys — camera, photo-read,

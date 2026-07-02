@@ -81,13 +81,19 @@ export default function PhotoStrip({ photos = [], max = 3, onPick, onSaveToPhoto
 
 function makeStyles(t) {
   return StyleSheet.create({
-    // space-between pins the first/last slots to the row edges (so they align
-    // with the full-width input above) and spaces the rest evenly.
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    slot: { width: 96, height: 96, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    // iPhone: space-between pins the first/last slots to the row edges (so they
+    // align with the full-width input above) and spaces the rest evenly.
+    // iPad: on a wide screen (esp. landscape) space-between flings the slots to
+    // opposite ends with a huge gap. Instead we cluster them — a left-aligned
+    // row with a fixed gap — so the trio keeps tidy, iPhone-like spacing
+    // regardless of orientation.
+    row: t.isTablet
+      ? { flexDirection: 'row', justifyContent: 'flex-start', gap: t.ui(48) }
+      : { flexDirection: 'row', justifyContent: 'space-between' },
+    slot: { width: t.ui(96), height: t.ui(96), borderRadius: t.ui(14), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     slotEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.iconBorder, backgroundColor: t.card },
     slotFilled: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
-    plus: { fontSize: 30, color: t.muted, fontWeight: '300' },
+    plus: { fontSize: t.uit(30), color: t.muted, fontWeight: '300' },
     img: { width: '100%', height: '100%', resizeMode: 'contain' },
   });
 }

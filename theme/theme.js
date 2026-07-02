@@ -6,8 +6,28 @@
 // by changing `fontFamily` here only.
 
 import { useState, useEffect } from 'react';
-import { useColorScheme, Appearance } from 'react-native';
+import { useColorScheme, Appearance, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ----- iPad scale system (mirrors Podium Notes' ui()/uit() approach) -----
+// On iPad, phone-sized type and chrome look undersized. We scale with two
+// tunable factors via helpers returned from useTheme():
+//   t.ui()  — chrome/spacing/icons.
+//   t.uit() — typography.
+// Both are no-ops on iPhone, so iPhone layout is completely unaffected.
+//
+// TABLET_SCALE is the single knob. Start at 1.2; tune during the iPad audit.
+const TABLET_SCALE = 1.3;        // chrome / spacing / icons
+const TABLET_TEXT_SCALE = 1.4;   // typography (kept equal to TABLET_SCALE for now)
+
+// Detection threshold (shortest side, in pt). The iPad mini's short side is
+// ~744pt in portrait — BELOW the common 768 cutoff — so we use 700 to make
+// sure the mini counts as a tablet. Phones (even Max) stay well under 700.
+const TABLET_MIN_SHORT_SIDE = 700;
+
+// NOTE: detection now uses the useWindowDimensions() hook inside useTheme(),
+// not a module-load Dimensions.get(). The hook reads correct values and
+// updates on rotation, so isTablet is reliable and orientation-aware.
 
 // ----- Theme mode (user override) -----
 // 'system' = follow the OS (default), 'light' / 'dark' = forced.
@@ -134,32 +154,43 @@ const DARK = {
 };
 
 // ----- Shared scale (same in both themes) -----
-export const type = {
-  // System font for now. To use Inter later: set fontFamily to 'Inter_xxx'
-  // and load via expo-font; everything else stays.
+// These are BUILDERS parameterized by the scale helpers, because scaling now
+// depends on runtime dimensions (isTablet from the hook). useTheme() calls
+// them with the current ui()/uit() so type/spacing scale on iPad and stay
+// identity on iPhone. Every screen spreads t.type.* / t.space.*, so this
+// scales text and spacing app-wide with no per-screen edits.
+const makeType = (uit) => ({
   fontFamily: undefined, // undefined = system font (San Francisco on iOS)
-  kicker:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  // Display title — large hero text. Available if a screen wants it.
-  title:       { fontSize: 30, fontWeight: '800', letterSpacing: 0.5 },
-  // Canonical screen title — what "Due Soon", "Settings", "Device detail"
-  // and every other screen header should use. Spread it with the spread
-  // operator: `title: { ...t.type.screenTitle, color: t.ink, ... }`.
-  screenTitle: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5 },
-  // Smaller title variant — for nested or secondary headers.
-  titleSm:     { fontSize: 22, fontWeight: '800', letterSpacing: 0.2 },
-  body:        { fontSize: 15, fontWeight: '600' },
-  meta:        { fontSize: 12, fontWeight: '500' },
-  pill:        { fontSize: 11.5, fontWeight: '700' },
-  btn:         { fontSize: 15, fontWeight: '700' },
-};
-
-export const space  = { xs: 4, sm: 8, md: 12, lg: 16, xl: 22, xxl: 28 };
-export const radius = { sm: 6, md: 8, chip: 11, card: 12, pill: 6, btn: 11 };
+  kicker:      { fontSize: uit(11), fontWeight: '700', letterSpacing: 1.6 },
+  title:       { fontSize: uit(30), fontWeight: '800', letterSpacing: 0.5 },
+  screenTitle: { fontSize: uit(26), fontWeight: '800', letterSpacing: 0.5 },
+  titleSm:     { fontSize: uit(22), fontWeight: '800', letterSpacing: 0.2 },
+  body:        { fontSize: uit(15), fontWeight: '600' },
+  meta:        { fontSize: uit(12), fontWeight: '500' },
+  pill:        { fontSize: uit(11.5), fontWeight: '700' },
+  btn:         { fontSize: uit(15), fontWeight: '700' },
+});
+const makeSpace  = (ui) => ({ xs: ui(4), sm: ui(8), md: ui(12), lg: ui(16), xl: ui(22), xxl: ui(28) });
+const makeRadius = (ui) => ({ sm: ui(6), md: ui(8), chip: ui(11), card: ui(12), pill: ui(6), btn: ui(11) });
 
 export function useTheme() {
   const scheme = useColorScheme();
   const palette = scheme === 'dark' ? DARK : LIGHT;
-  return { ...palette, type, space, radius };
+
+  // Reactive dimensions — reads correctly and updates on rotation.
+  const { width, height } = useWindowDimensions();
+  const isTablet = Math.min(width, height) >= TABLET_MIN_SHORT_SIDE;
+
+  // Scale helpers: identity on iPhone, ×factor (rounded) on iPad.
+  const ui  = (n) => (isTablet ? Math.round(n * TABLET_SCALE) : n);
+  const uit = (n) => (isTablet ? Math.round(n * TABLET_TEXT_SCALE) : n);
+
+  // Build the scaled tokens for this render.
+  const type   = makeType(uit);
+  const space  = makeSpace(ui);
+  const radius = makeRadius(ui);
+
+  return { ...palette, type, space, radius, ui, uit, isTablet };
 }
 
 export { LIGHT, DARK };

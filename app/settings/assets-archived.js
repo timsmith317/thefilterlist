@@ -10,6 +10,7 @@
 // same destructive confirmation as the per-item delete.
 
 import React, { useCallback, useState } from 'react';
+import useFixScrollToTop from '../../lib/useFixScrollToTop';
 import {
   View, Text, Pressable, StyleSheet, ScrollView, Alert,
 } from 'react-native';
@@ -26,6 +27,7 @@ import {
 
 export default function ArchivedAssetsSettings() {
   const t = useTheme();
+  const scrollsToTop = useFixScrollToTop();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState(null);
@@ -141,6 +143,7 @@ export default function ArchivedAssetsSettings() {
       </View>
 
       <ScrollView
+        scrollsToTop={scrollsToTop}
         style={s.scrollView}
         onLayout={e => setViewportH(e.nativeEvent.layout.height)}
         onContentSizeChange={(w, h) => setContentH(h)}
@@ -208,10 +211,10 @@ function makeStyles(t) {
     // overflowing off-screen (same fix as the other list screens).
     scrollView: { flex: 1 },
 
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
-    sub: { fontSize: 13, color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
+    title: { fontSize: t.uit(26), fontWeight: '800', letterSpacing: 0.5, color: t.ink, marginTop: 4, paddingLeft: 16 },
+    sub: { fontSize: t.uit(13), color: t.muted, marginTop: 4, paddingLeft: 16, marginBottom: 22, lineHeight: 18 },
 
-    empty: { fontSize: 13, color: t.muted, fontStyle: 'italic', paddingLeft: 13, paddingVertical: 12 },
+    empty: { fontSize: t.uit(13), color: t.muted, fontStyle: 'italic', paddingLeft: 13, paddingVertical: 12 },
 
     card: {
       flexDirection: 'row', alignItems: 'center',
@@ -222,9 +225,9 @@ function makeStyles(t) {
       opacity: 0.85, // subtle dim — archived state cue
     },
     cardPressed: { backgroundColor: t.tabIdleBg, opacity: 1 },
-    cardName: { fontSize: 16, fontWeight: '700', color: t.ink },
-    cardMeta: { fontSize: 13, color: t.muted, marginTop: 3 },
-    chev: { fontSize: 22, color: t.muted, paddingLeft: 8 },
+    cardName: { fontSize: t.uit(16), fontWeight: '700', color: t.ink },
+    cardMeta: { fontSize: t.uit(13), color: t.muted, marginTop: 3 },
+    chev: { fontSize: t.uit(22), color: t.muted, paddingLeft: 8 },
 
     // "Delete all" — same grey-fill shape/behavior as the other big buttons.
     deleteAllBtn: {
@@ -234,7 +237,7 @@ function makeStyles(t) {
       alignItems: 'center',
     },
     deleteAllInline: { marginTop: 6 },
-    deleteAllTxt: { fontSize: 15, fontWeight: '700', color: t.ink },
+    deleteAllTxt: { fontSize: t.uit(15), fontWeight: '700', color: t.ink },
 
     // Pinned footer bar (opaque so the list scrolls behind it cleanly).
     footer: {
