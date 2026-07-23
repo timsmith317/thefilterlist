@@ -74,7 +74,7 @@ export function useThemeMode() {
     if (!VALID_MODES.includes(next)) return;
     cachedMode = next;
     setModeState(next);
-    Appearance.setColorScheme(next === 'system' ? null : next);
+    Appearance.setColorScheme(next === 'system' ? 'unspecified' : next);
     AsyncStorage.setItem(MODE_KEY, next).catch(() => {});
   };
 

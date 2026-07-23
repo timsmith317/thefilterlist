@@ -1,5 +1,14 @@
-// components/DatePickerModal.js — iOS-style bottom-sheet wrapping
-// DateTimePicker (spinner) with Cancel and Done.
+// components/DatePickerModal.js -> ~/Projects/thefilterlist/components/DatePickerModal.js
+//
+// Date picker with two completely different platform paths:
+//
+//   iOS     - DateTimePicker renders INLINE as a spinner, so we wrap it in our
+//             own animated bottom sheet with Cancel / Done (everything below).
+//   ANDROID - DateTimePicker presents its OWN native Material dialog. Wrapping
+//             that inside our sheet stacked two modals and left the calendar
+//             inert, so on Android we render it bare and map its CANCEL/OK onto
+//             our onCancel/onConfirm via onValueChange + onDismiss. See the
+//             Platform.OS branch below.
 //
 // Solves the "can't accept today" issue: the user always confirms via Done;
 // default value is today so Done with no scroll commits today.
@@ -75,6 +84,40 @@ export default function DatePickerModal({ visible, initialDate, maximumDate, tit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // ---- ANDROID ----
+  // On Android, DateTimePicker is NOT an inline view — it presents its own
+  // native Material dialog. Nesting it inside our custom <Modal> sheet stacked
+  // two modals: the calendar rendered but our overlay swallowed its touches, so
+  // it looked greyed out and only our Cancel/Done responded.
+  //
+  // So on Android we skip the custom sheet entirely and render the picker bare.
+  // The native dialog supplies its own CANCEL / OK, which we translate into our
+  // onCancel / onConfirm contract (see the callbacks below).
+  if (Platform.OS === 'android') {
+    if (!visible) return null;
+    return (
+      <DateTimePicker
+        value={date}
+        mode="date"
+        display="default"
+        maximumDate={maximumDate}
+        // The native dialog owns its own CANCEL / OK, so we map those onto our
+        // contract with two callbacks rather than the deprecated `onChange`
+        // event type:
+        //   onValueChange -> OK pressed, `selected` is the chosen date
+        //   onDismiss     -> CANCEL, back button, or tap outside
+        // Either way the dialog closes itself; the parent then clears the state
+        // that set `visible`, so there's nothing to unmount manually.
+        onValueChange={(_event, selected) => {
+          if (selected) onConfirm && onConfirm(selected);
+        }}
+        onDismiss={() => { onCancel && onCancel(); }}
+      />
+    );
+  }
+
+  // ---- iOS ----
+  // Inline spinner inside our own animated sheet (see notes at top of file).
   return (
     <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
       <View style={s.modalRoot}>
@@ -96,7 +139,7 @@ export default function DatePickerModal({ visible, initialDate, maximumDate, tit
             <DateTimePicker
               value={date}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="spinner"
               maximumDate={maximumDate}
               // The library deprecated `onChange` in favor of `onValueChange`
               // (same (event, date) signature; the new listener takes

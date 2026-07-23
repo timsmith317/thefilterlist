@@ -47,6 +47,7 @@ export default function MarkReplacedSheet({
   const [checked, setChecked] = useState(() => new Set());
   const [date, setDate] = useState(new Date());
   const [tempDate, setTempDate] = useState(new Date());   // edited in the 'date' phase
+  const [androidDateOpen, setAndroidDateOpen] = useState(false); // Android: native dialog over the sheet
   const slideAnim = useRef(new Animated.Value(SLIDE_DISTANCE)).current;
 
   useEffect(() => {
@@ -83,12 +84,37 @@ export default function MarkReplacedSheet({
   const confirm = () => { if (count > 0 && onConfirm) onConfirm([...checked], date); };
 
   // Open the date step editing a copy; Set commits it, Cancel discards it.
-  const openDate = () => { setTempDate(date); setPhase('date'); };
+  // On iOS the date step is a PHASE of this sheet (inline spinner). On Android
+  // DateTimePicker presents its own native dialog, so switching phase would put
+  // that dialog on top of a now-empty sheet with dead Cancel/Set buttons — the
+  // same stacked-modal trap that froze TimePickerModal. Instead we stay on the
+  // 'select' phase and raise the native dialog over it.
+  const openDate = () => {
+    setTempDate(date);
+    if (Platform.OS === 'android') setAndroidDateOpen(true);
+    else setPhase('date');
+  };
   const setDateAndBack = () => { setDate(tempDate); setPhase('select'); };
   const cancelDate = () => setPhase('select');
 
   return (
     <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
+      {/* Android only: native date dialog raised over the sheet. OK commits the
+          date directly (no separate "Set" step, since the dialog has its own
+          confirm); dismiss just closes it and leaves the date unchanged. */}
+      {Platform.OS === 'android' && androidDateOpen && (
+        <DateTimePicker
+          value={tempDate}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onValueChange={(_e, d) => {
+            if (d) setDate(d > new Date() ? new Date() : d);
+            setAndroidDateOpen(false);
+          }}
+          onDismiss={() => setAndroidDateOpen(false)}
+        />
+      )}
       <View style={s.modalRoot}>
         <Pressable style={s.backdrop} onPress={onCancel} />
         <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
@@ -158,9 +184,9 @@ export default function MarkReplacedSheet({
                 <DateTimePicker
                   value={tempDate}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  display="spinner"
                   maximumDate={new Date()}
-                  onChange={(_e, d) => { if (d) setTempDate(d > new Date() ? new Date() : d); }}
+                  onValueChange={(_e, d) => { if (d) setTempDate(d > new Date() ? new Date() : d); }}
                   themeVariant={t.mode === 'dark' ? 'dark' : 'light'}
                 />
               </View>

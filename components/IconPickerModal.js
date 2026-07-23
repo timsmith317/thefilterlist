@@ -1,38 +1,37 @@
-// components/IconPickerModal.js — choose a Device's icon.
+// components/IconPickerModal.js → ~/Projects/thefilterlist/components/IconPickerModal.js
+//
+// Choose a Device's icon.
 //
 // iOS SHEET picker (presentationStyle="pageSheet"): the card is inset from the
 // top with rounded corners and the form peeks behind it, so it clearly reads as
-// a modal — no dim ambiguity, and no competing Save button to confuse with this
-// screen's controls.
+// a modal — no dim ambiguity, and no competing Save button.
 //
-// A sectioned grid of glyph tiles (SF Symbols). Leads with the app's own water
-// (SF "humidity") and air (SF "fan") marks, then water / air & climate / home &
-// appliances / auto / utility families. Tiles show the glyph only — no cryptic
-// symbol names for the user to decode.
+// A sectioned grid of glyph tiles. CROSS-PLATFORM: every glyph is Material
+// Design Icons (Apache 2.0) rendered through react-native-svg, plus our own
+// custom 'water-layers' mark. No SF Symbols — they're Apple-platform-only and
+// rendered blank on Android.
 //
 // NO "AUTO" CHOICE: a device with no icon override already derives its glyph
 // from the filters attached to it (see DeviceIcon / deviceDisplayType). So a
-// user who never opens this picker, or picks nothing, gets the automatic glyph
-// for free. The picker's only job is to SET an explicit symbol.
+// user who never opens this picker gets the automatic glyph for free. This
+// picker's only job is to SET an explicit icon.
 //
 // TAP TO APPLY: tapping any glyph applies it and closes immediately (onSave).
 // The header has a single Cancel; there's no separate Done step.
 //
-// onSave returns the chosen SF Symbol name. expo-symbols is a native module —
-// symbols render only in a dev/standalone build, not Expo Go.
+// onSave returns the icon NAME string (e.g. 'fridge', 'water-layers'), stored
+// on the device as `icon`. Legacy SF names saved by older iOS builds are
+// translated at render time by DeviceIcon — see theme/iconPaths.js.
 //
-// TO ADD MORE SYMBOLS: extend a section's `names` in SECTIONS below. Verify
-// names in Apple's SF Symbols app — an unknown name renders the generic
-// fallback tile (IconOther) instead of the symbol, so prune any tile that shows
-// the plain divider glyph on your OS version. Many appliance/auto symbols are
-// iOS 17+ (fine on current devices).
+// TO ADD MORE ICONS: add the path to ICON_PATHS in theme/iconPaths.js, then add
+// its name to a section below. Browse the full 7,000+ set at
+// https://pictogrammers.com/library/mdi/
 
 import React from 'react';
 import { View, Text, Pressable, Modal, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
 import { useTheme } from '../theme/theme';
-import { IconOther } from '../theme/Icons';
+import { MdiIcon, IconWater, IconOther } from '../theme/Icons';
 
 // Glyph grid, grouped into sections. The first section leads with the app's own
 // water/air marks. Sibling-of-verified names (the iOS-17 appliance/home/auto
@@ -40,42 +39,49 @@ import { IconOther } from '../theme/Icons';
 const SECTIONS = [
   {
     title: 'Suggested',
-    names: ['humidity', 'fan', 'drop.fill', 'wind', 'house.fill', 'car.fill'],
+    names: ['water-layers', 'fan', 'filter-variant', 'home', 'office-building', 'car'],
   },
   {
     title: 'Water',
     names: [
-      'drop', 'drop.fill', 'spigot.fill', 'shower.fill', 'bathtub.fill',
-      'sink.fill', 'toilet.fill', 'waterbottle.fill', 'humidity', 'camera.filters',
+      'water', 'water-outline', 'water-percent', 'water-pump', 'shower',
+      'bathtub', 'faucet', 'toilet', 'bottle-tonic', 'filter',
     ],
   },
   {
     title: 'Air & Climate',
     names: [
-      'fan', 'wind', 'air.conditioner.horizontal.fill', 'air.conditioner.vertical.fill',
-      'air.purifier.fill', 'humidifier.fill', 'thermometer', 'thermometer.medium',
-      'heater.vertical.fill', 'snowflake', 'flame.fill',
+      'fan', 'weather-windy', 'air-conditioner', 'hvac', 'air-purifier',
+      'air-humidifier', 'thermometer', 'thermometer-lines', 'radiator',
+      'snowflake', 'fire',
     ],
   },
   {
-    title: 'Home & Appliances',
+    title: 'Home & Places',
     names: [
-      'house.fill', 'refrigerator.fill', 'washer.fill', 'dryer.fill', 'dishwasher.fill',
-      'oven.fill', 'microwave.fill', 'cooktop.fill', 'lightbulb.fill', 'powerplug.fill',
+      'home', 'office-building', 'fridge', 'washing-machine', 'tumble-dryer',
+      'dishwasher', 'toaster-oven', 'microwave', 'stove', 'lightbulb', 'power-plug',
     ],
   },
   {
     title: 'Auto',
-    names: ['car.fill', 'bolt.car.fill', 'fuelpump.fill', 'engine.combustion.fill', 'steeringwheel'],
+    names: ['car', 'car-electric', 'gas-station', 'engine', 'steering'],
   },
   {
     title: 'Utility',
     names: [
-      'gauge.with.dots.needle.bottom.50percent', 'gearshape.fill', 'wrench.and.screwdriver.fill',
-      'bolt.fill', 'leaf.fill', 'line.3.horizontal.decrease', 'sparkles',
+      'gauge', 'cog', 'tools', 'lightning-bolt', 'leaf', 'filter-variant', 'auto-fix',
     ],
   },
 ];
+
+// 'water-layers' is our custom glyph rather than an MDI path, so it needs its
+// own component. Everything else is a straight MDI lookup.
+function GlyphTile({ name, size, color }) {
+  if (name === 'water-layers') return <IconWater size={size} color={color} />;
+  return <MdiIcon name={name} size={size} color={color} />;
+}
+
 
 export default function IconPickerModal({ visible, value = null, onCancel, onSave }) {
   const t = useTheme();
@@ -110,14 +116,7 @@ export default function IconPickerModal({ visible, value = null, onCancel, onSav
                         style={[s.tile, on && s.tileOn]}
                         onPress={() => onSave(name)}
                       >
-                        <SymbolView
-                          name={name}
-                          type="monochrome"
-                          tintColor={t.iconInk}
-                          size={t.ui(28)}
-                          resizeMode="scaleAspectFit"
-                          fallback={<IconOther size={t.ui(28)} color={t.iconInk} />}
-                        />
+                        <GlyphTile name={name} size={t.ui(28)} color={t.iconInk} />
                       </Pressable>
                     );
                   })}

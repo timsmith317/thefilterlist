@@ -77,6 +77,32 @@ export default function TimePickerModal({
 
   const confirm = () => onConfirm(formatHHMM(picked));
 
+  // ---- ANDROID ----
+  // Same platform split as DatePickerModal: on Android DateTimePicker is not an
+  // inline view, it presents its OWN native dialog. Nesting it inside our custom
+  // sheet stacked two modals, so the time could be spun but neither Done nor
+  // Cancel could commit or dismiss it — the screen got stuck and needed a force
+  // quit. On Android we render the picker bare and let the native dialog's
+  // OK / CANCEL drive our onConfirm / onCancel.
+  if (Platform.OS === 'android') {
+    if (!visible) return null;
+    return (
+      <DateTimePicker
+        mode="time"
+        display="default"
+        value={picked}
+        minuteInterval={5}
+        // onValueChange fires on OK with the chosen time; onDismiss covers
+        // CANCEL, the back gesture, and taps outside the dialog.
+        onValueChange={(_event, selected) => {
+          if (selected) onConfirm(formatHHMM(selected));
+        }}
+        onDismiss={() => { onCancel && onCancel(); }}
+      />
+    );
+  }
+
+  // ---- iOS ----
   return (
     <Modal visible={internalVisible} transparent animationType="none" onRequestClose={onCancel}>
       <View style={s.modalRoot}>
@@ -95,9 +121,9 @@ export default function TimePickerModal({
           <View style={s.pickerCenter}>
             <DateTimePicker
               mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="spinner"
               value={picked}
-              onChange={(_evt, d) => { if (d) setPicked(d); }}
+              onValueChange={(_evt, d) => { if (d) setPicked(d); }}
               minuteInterval={5}
               themeVariant={t.mode === 'dark' ? 'dark' : 'light'}
             />

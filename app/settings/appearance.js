@@ -54,7 +54,7 @@ export default function AppearanceSettings() {
     return () => {
       if (!savedRef.current) {
         const m = initialModeRef.current;
-        Appearance.setColorScheme(m === 'system' ? null : m);
+        Appearance.setColorScheme(m === 'system' ? 'unspecified' : m);
       }
     };
   }, []);
@@ -63,7 +63,7 @@ export default function AppearanceSettings() {
     setSelected(k);
     // Preview only — persisted on Save. useTheme() re-renders this screen
     // (and everything behind the sheet) in the new scheme instantly.
-    Appearance.setColorScheme(k === 'system' ? null : k);
+    Appearance.setColorScheme(k === 'system' ? 'unspecified' : k);
   };
 
   const onSave = () => {

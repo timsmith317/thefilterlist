@@ -23,6 +23,12 @@
  *       makes our explicit options win over the auto-application).
  *   Net: no mic key. After prebuild, verify with grep -c on the generated
  *   Info.plist (expect 0), and grep -c NSCameraUsageDescription (expect 1).
+ *
+ * ANDROID BUILD: the local ./plugins/withGradleVersion plugin pins the Gradle
+ *   wrapper version during prebuild. Without it the generated Gradle 9.x
+ *   wrapper fails configuration with a missing JvmVendorSpec.IBM_SEMERU field.
+ *   Verify after prebuild with:
+ *     grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
  */
 const variant = process.env.APP_VARIANT;
 const IS_DEV = variant === 'development';
@@ -123,6 +129,12 @@ module.exports = {
       'expo-file-system',
       'expo-sharing',
       'expo-font',
+      // Local plugin. Pins the Gradle wrapper during prebuild — the template's
+      // default Gradle 9.x fails on an upstream IBM_SEMERU reference removed in
+      // Gradle 9. Because android/ is regenerated on every prebuild (and EAS
+      // runs its own), this has to live here rather than as a manual edit to
+      // gradle-wrapper.properties. See plugins/withGradleVersion.js.
+      './plugins/withGradleVersion',
     ],
     experiments: {
       typedRoutes: true,

@@ -10,7 +10,7 @@
 import React, { useState, useCallback } from 'react';
 import useFixScrollToTop from '../../lib/useFixScrollToTop';
 import {
-  View, Text, Pressable, StyleSheet, ScrollView, Switch,
+  View, Text, Pressable, StyleSheet, ScrollView, Switch, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -21,6 +21,7 @@ import TimePickerModal from '../../components/TimePickerModal';
 import { loadData, saveData, updateReminders } from '../../data/store';
 import {
   ensurePermissions, getPermissionStatus, openAppNotificationSettings,
+  scheduleTestNotification, debugDumpScheduled,
 } from '../../lib/notifications';
 
 const DAY_OPTIONS = [
@@ -133,16 +134,19 @@ export default function RemindersSettings() {
         <Text style={s.title}>Reminders</Text>
         <Text style={s.sub}>Get notified before devices are due.</Text>
 
-        {/* Permission banner if reminders are on but iOS notifications are off */}
+        {/* Permission banner if reminders are on but OS notifications are off.
+            Copy is platform-neutral — this screen ships on Android too. */}
         {enabled && !perm.granted && (
           <View style={s.banner}>
             <Text style={s.bannerTitle}>Notifications disabled</Text>
             <Text style={s.bannerBody}>
-              Reminders are on, but iOS notifications are off for this app.
+              Reminders are on, but notifications are turned off for this app.
               Enable them in Settings to start receiving alerts.
             </Text>
             <Pressable style={s.bannerBtn} onPress={openAppNotificationSettings}>
-              <Text style={s.bannerBtnTxt}>Open iOS Settings</Text>
+              <Text style={s.bannerBtnTxt}>
+                {Platform.OS === 'ios' ? 'Open iOS Settings' : 'Open Settings'}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -186,6 +190,46 @@ export default function RemindersSettings() {
           </Text>
           <Text style={[s.chev, !enabled && s.rowDim]}>{'\u203A'}</Text>
         </Pressable>
+        {/* ---- DEV ONLY ----------------------------------------------------
+            __DEV__ is false in preview/production builds, so this whole block
+            is stripped from anything you ship. Remove it once notifications
+            are confirmed working on both platforms.
+
+            "Send test notification" schedules a real one 15s out through the
+            same permission + channel path as live reminders — background the
+            app to see it (foreground notifications are swallowed by
+            setNotificationHandler in lib/notifications.js).
+
+            "Dump scheduled" logs the pending queue to Metro. Entries present =
+            scheduling works and any failure is in delivery; empty list =
+            scheduling never ran.
+        ------------------------------------------------------------------- */}
+        {__DEV__ && (
+          <>
+            <Text style={s.label}>DEBUG (DEV BUILDS ONLY)</Text>
+            <Pressable
+              style={s.row}
+              onPress={async () => {
+                const res = await scheduleTestNotification(15);
+                console.log('[notif-test]', res);
+              }}
+            >
+              <Text style={s.rowValue}>Send test notification (15s)</Text>
+              <Text style={s.chev}>{'\u203A'}</Text>
+            </Pressable>
+            <Pressable
+              style={[s.row, { marginTop: 8 }]}
+              onPress={() => debugDumpScheduled()}
+            >
+              <Text style={s.rowValue}>Dump scheduled to Metro</Text>
+              <Text style={s.chev}>{'\u203A'}</Text>
+            </Pressable>
+            <Text style={s.hint}>
+              Background the app after tapping — foreground notifications are
+              intercepted by the app, not shown by the OS.
+            </Text>
+          </>
+        )}
       </ScrollView>
 
       <TimePickerModal

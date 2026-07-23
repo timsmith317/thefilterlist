@@ -18,9 +18,9 @@ import {
   View, Text, Pressable, StyleSheet, Modal, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/theme';
+import { MdiIcon } from '../theme/Icons';
 import BrandMark from './BrandMark';
 
 const ONBOARDED_KEY = 'thefilterlist.onboarded.v1';
@@ -42,17 +42,17 @@ const SLIDES = [
     body: 'Keep track of every filter across your home, car, and workplace — and always know what\u2019s due next.',
   },
   {
-    icon: 'rectangle.stack.fill',
+    icon: 'layers',
     title: 'Assets, Devices, Filters',
     body: 'Group by Asset (Home, Auto, Work), add the Devices that take filters \u2014 a furnace, the fridge, your car \u2014 and track each Filter on its own schedule.',
   },
   {
-    icon: 'bell.badge.fill',
+    icon: 'bell-badge',
     title: 'Stay ahead of every change',
     body: 'The home screen shows what\u2019s due soon at a glance. Keep an on-hand count so you never run out, and turn on reminders to get notified before a filter is due.',
   },
   {
-    icon: 'sparkles',
+    icon: 'auto-fix',
     title: 'Sample data to explore',
     body: 'We\u2019ve added a few sample devices so you can see how everything works. When you\u2019re ready to start your own, remove them anytime under Settings \u203a Backup & Restore \u203a Delete Sample Data \u2014 anything you\u2019ve added or edited is never touched.',
   },
@@ -134,7 +134,7 @@ export default function OnboardingModal() {
                 <View style={s.brandWrap}><BrandMark size={96} /></View>
               ) : (
                 <View style={s.iconWrap}>
-                  <SymbolView name={sl.icon} size={62} tintColor={ICON_GLYPH} resizeMode="scaleAspectFit" />
+                  <MdiIcon name={sl.icon} size={62} color={ICON_GLYPH} />
                 </View>
               )}
               <Text style={s.slideTitle}>{sl.title}</Text>
