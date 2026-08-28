@@ -1,3 +1,5 @@
+// File: app/settings.js → ~/Projects/thefilterlist/app/settings.js
+//
 // app/settings.js — Settings hub. Bordered chevron cards, usage-ordered.
 //
 // NOTE (iPad landscape scroll): when returning to this screen from a subscreen
@@ -22,13 +24,17 @@ export default function Settings() {
   const scrollsToTop = useFixScrollToTop();
 
   // Row order is usage-based: Devices → Filters → Assets → Reminders → Backup →
-  // Appearance → Help → About. Every row is a bordered chevron card.
+  // Sync → Appearance → Help → About. Every row is a bordered chevron card.
+  //
+  // Sync sits next to Backup because they answer the same question — "where else
+  // does my data live?" — and someone hunting for one will scan for the other.
   const rows = [
     { k: 'devices',    label: 'Devices',          desc: 'Add, edit, and schedule devices',  route: '/settings/devices' },
     { k: 'filters',    label: 'Filters',          desc: 'Track on-hand stock and reorders', route: '/settings/filters' },
     { k: 'assets',     label: 'Assets & Archive', desc: 'Manage and reorder your assets',   route: '/settings/assets' },
     { k: 'reminders',  label: 'Reminders',        desc: 'Push notifications, lead time',    route: '/settings/reminders' },
     { k: 'backup',     label: 'Backup & Restore', desc: 'Export / import your data',        route: '/settings/backup' },
+    { k: 'sync',       label: 'Sync',             desc: 'Keep your devices up to date',     route: '/settings/sync' },
     { k: 'appearance', label: 'Appearance',       desc: 'System, light, or dark theme',     route: '/settings/appearance' },
     { k: 'help',       label: 'Help & Tips',      desc: 'How the app works',                route: '/settings/help' },
     { k: 'about',      label: 'About',            desc: 'Version, credits, and licenses',   route: '/settings/about' },

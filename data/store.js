@@ -1,5 +1,3 @@
-// File: data/store.js → ~/Projects/thefilterlist/data/store.js
-//
 // data/store.js — The Filter List data layer (v2).
 // Model: Asset -> Device -> Stage(s) -> Filter. (Assets are the one org dimension.)
 //
@@ -606,6 +604,18 @@ export async function saveData(data) {
     const { syncDeviceNotifications } = await import('../lib/notifications');
     await syncDeviceNotifications(data);
   } catch (e) { /* silent */ }
+
+  // Nudge cloud sync after a local change. Dynamic import for the same reason
+  // notifications uses one: it breaks the module cycle (syncClient imports this
+  // file) and keeps any failure from touching a normal save.
+  //
+  // scheduleSync is debounced AND declines to queue while a sync is running —
+  // which matters because runSync calls saveData itself. Without that guard,
+  // every sync would schedule the next one indefinitely.
+  try {
+    const { scheduleSync } = await import('../lib/syncClient');
+    scheduleSync();
+  } catch (e) { /* silent — sync is optional, saving is not */ }
 }
 
 export async function resetToSeed() {

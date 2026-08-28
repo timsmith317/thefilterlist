@@ -10,6 +10,24 @@ main = "src/index.js"
 compatibility_date = "2026-08-01"
 preview_urls = false
 
+# workers_dev is left ENABLED on purpose until every device has been moved to the
+# custom domain. Turning it off retires the *.workers.dev URL immediately, and
+# any device still holding that saved address would silently stop syncing — the
+# app keeps working, so nobody would notice for a while. Set this to false and
+# redeploy only AFTER both devices show the new address on the Sync screen.
+#
+# KEEP THIS ABOVE [[routes]]. In TOML every key after a table header belongs to
+# that table, so a top-level setting written below one silently becomes a
+# property of the route instead — which parses fine and does nothing.
+workers_dev = true
+
+# Custom domain. Keeps the personal workers.dev subdomain out of the shipped app.
+# Cloudflare provisions the DNS record and the certificate automatically because
+# thefilterlist.app is already on this account.
+[[routes]]
+pattern = "sync.thefilterlist.app"
+custom_domain = true
+
 # D1 — the record store. Already created; this is the real id.
 #
 # `binding` is the name the CODE uses — env.DB in src/sync.js, src/photos.js and

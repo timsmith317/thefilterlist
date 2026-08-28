@@ -1,3 +1,5 @@
+// File: app/index.js → ~/Projects/thefilterlist/app/index.js
+//
 // app/index.js — Due Soon (home screen).
 //
 // Config constants (tweak these):
@@ -40,7 +42,7 @@ const CARD_PADDING = 14;
 const TABLET_COLUMNS = 2;
 // =================================================================
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../theme/theme';
@@ -52,6 +54,7 @@ import {
 } from '../data/store';
 import { formatInterval } from '../lib/interval';
 import useFixScrollToTop from '../lib/useFixScrollToTop';
+import { syncNow } from '../lib/syncClient';
 
 
 export default function DueSoon() {
@@ -60,12 +63,32 @@ export default function DueSoon() {
   const router = useRouter();
   const [data, setData] = useState(null);
   const [tab, setTab] = useState('All');
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let active = true;
     loadData().then(d => { if (active) setData(d); });
     return () => { active = false; };
   }, []));
+
+  // Pull to refresh. This is the gesture people reach for when they want to
+  // know whether another device has changed something — the automatic triggers
+  // (app opens, and a few seconds after a local edit) can't fire while you're
+  // just sitting on this screen watching it.
+  //
+  // It reloads local data whether or not sync is on or succeeds: syncNow()
+  // resolves with a result object instead of throwing, so a disabled or
+  // unreachable sync simply means the refresh re-reads what's already here.
+  // The gesture must never appear broken because the network is.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await syncNow(); } catch (_) { /* never surfaced here */ }
+    try {
+      const d = await loadData();
+      setData(d);
+    } catch (_) { /* keep showing what we have */ }
+    setRefreshing(false);
+  }, []);
 
   if (!data) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
 
@@ -107,7 +130,14 @@ export default function DueSoon() {
           );
         })}
       </ScrollView>
-      <ScrollView scrollsToTop={scrollsToTop} style={s.list} contentContainerStyle={[s.listContent, t.isTablet && s.listContentTablet]}>
+      <ScrollView
+        scrollsToTop={scrollsToTop}
+        style={s.list}
+        contentContainerStyle={[s.listContent, t.isTablet && s.listContentTablet]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.muted} />
+        }
+      >
         {list.length === 0 && <Text style={s.empty}>No devices here yet.</Text>}
         {list.map(f => {
           const tone = t.status[f.status.key];
