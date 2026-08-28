@@ -1,3 +1,5 @@
+// File: app/filter/new.js → ~/Projects/thefilterlist/app/filter/new.js
+//
 // app/filter/new.js — New Filter.
 // Modal page padding (clears iOS modal chrome edge). Title indented 16 to
 // match Settings. Field labels indented 13 to align with input text inside
@@ -108,15 +110,17 @@ export default function NewFilter() {
       setCameraOpen(true);
       return;
     }
-    // Library import → asset → custom cropper.
+    // Library import → asset → custom cropper (the only path that still uses it).
     const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
   };
 
-  const onCameraCaptured = (asset) => {
+  // Camera path: the modal already persisted the photo. Straight into the strip
+  // — no cropper. The viewfinder was the crop.
+  const onCameraCaptured = (stored) => {
     setCameraOpen(false);
-    if (asset) setCropAsset(asset);
+    if (stored) setPhotos(prev => [...prev, stored].slice(0, MAX_FILTER_PHOTOS));
   };
 
   const onCroppedPhoto = (stored) => {

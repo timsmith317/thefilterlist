@@ -3,18 +3,23 @@
 // components/CameraCaptureModal.js — in-app camera capture in the app's framed
 // style, built on expo-camera (CameraView).
 //
+// POINT, SHOOT, SAVED. onCapture receives a STORED FILENAME, ready for the
+// strip — not an asset to be cropped. The viewfinder is the crop; you already
+// framed the shot. The cropper is for library imports only.
+//
 // PORTRAIT-ONLY CAPTURE (the decision that ends the orientation fight):
 //   Every photo is captured with the device held UPRIGHT. A portrait capture
 //   produces a portrait sensor frame, which is already 3:4 — so the viewfinder
-//   matches the capture, the cropper opens on what was framed, and the 3:4
-//   strip slot fills with no bars.
+//   matches the capture and the 3:4 strip slot fills with no bars.
 //
 //   HOW IT'S ENFORCED — measured layout, not an OS orientation lock:
 //     - The body measures itself. Wider than tall = device held sideways.
 //     - Sideways: the CameraView is UNMOUNTED and the frame shows a solid black
-//       "camera off" panel with a turn-upright prompt. The shutter moves to the
-//       LEFT of the frame (where "below" lands once you turn the device) and is
-//       disabled, with a rotate prompt beside it.
+//       "camera off" panel with a turn-upright prompt. The shutter sits to the
+//       LEFT of the frame — where "below the viewfinder" lands once the device
+//       is turned — and is disabled. Its label is ROTATED a quarter turn, so it
+//       only reads correctly after you turn the device: an instruction you have
+//       to obey before you can read it can't be mistaken for a live button.
 //     - Upright: normal portrait 3:4 viewfinder, camera live, shutter beneath.
 //
 //   WHY THE CAMERA IS UNMOUNTED SIDEWAYS, not rotated:
@@ -23,17 +28,17 @@
 //     it composites as a hole in the window — so a rotated preview rendered at
 //     its own aspect in the middle of the frame and the app behind the modal
 //     showed through the rest. Measured on the Pixel Tablet: a 793x597 frame
-//     with a 448x597 preview (the untransformed 3:4 stream) and the filter form
-//     visible around it. Not mounting the camera removes the surface entirely,
-//     so the panel is genuinely blank.
+//     with a 448x597 preview and the filter form visible around it. Not mounting
+//     the camera removes the surface entirely, so the panel is genuinely blank.
 //
 //   WHY NOT expo-screen-orientation: its portrait lockAsync did not engage on
 //   the Pixel Tablet in this RN / react-native-screens version — the capture UI
 //   stayed upright in landscape and capture went through anyway.
 //
-// DIAGNOSTIC: shoot() logs '[TFL capture]' with the raw capture dims, the
-// prepared dims, and the viewfinder box. This is how we settle whether the
-// saved photo's field of view matches the preview. Remove once resolved.
+// SIZING: FRAME_SCALE trims the viewfinder off the largest box that would fit.
+// Full-bleed reads as overwhelming on a tablet; a smaller centred frame reads as
+// a viewfinder. The frame is centred on SCREEN in both orientations — sideways,
+// a spacer mirrors the shutter column so the shutter doesn't push it off-centre.
 //
 // expo-camera is a native module — needs a dev rebuild. Preview does NOT render
 // in Mac screen-mirroring; test on a physical device.
@@ -44,7 +49,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '../theme/theme';
 import { BackButton } from './HeaderBits';
-import { prepareCameraPhoto } from '../lib/filterPhotos';
+import { captureAndPersist } from '../lib/filterPhotos';
+
+// Fraction of the largest fitting box the viewfinder actually uses.
+const FRAME_SCALE = 0.7;
+// Width of the shutter column when sideways (mirrored as a spacer on the right
+// so the frame stays screen-centred).
+const SHUTTER_COL_W = 150;
+// Extra breathing room above the frame in portrait, clear of the tablet's
+// status/handle chrome at the top of the sheet.
+const PORTRAIT_TOP_PAD = 28;
 
 export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   const t = useTheme();
@@ -81,25 +95,27 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
 
   const isLandscape = body.w > 0 && body.w > body.h;
 
-  // The camera is torn down when we go sideways, so it will re-initialise on
-  // the way back to portrait — clear ready so the shutter waits for it.
+  // The camera is torn down when we go sideways, so it will re-initialise on the
+  // way back to portrait — clear ready so the shutter waits for it.
   useEffect(() => {
     if (isLandscape) setReady(false);
   }, [isLandscape]);
 
-  // Largest 3:4 box that fits when upright; largest 4:3 box when sideways.
+  // Largest 3:4 box that fits when upright; largest 4:3 box when sideways —
+  // then scaled down by FRAME_SCALE so it reads as a viewfinder, not a wall.
   const frameBox = useMemo(() => {
     if (!area.w || !area.h) return { w: 0, h: 0 };
+    let w, h;
     if (isLandscape) {
-      let h = area.h;
-      let w = (h * 4) / 3;
+      h = area.h;
+      w = (h * 4) / 3;
       if (w > area.w) { w = area.w; h = (w * 3) / 4; }
-      return { w: Math.round(w), h: Math.round(h) };
+    } else {
+      w = area.w;
+      h = (w * 4) / 3;
+      if (h > area.h) { h = area.h; w = (h * 3) / 4; }
     }
-    let w = area.w;
-    let h = (w * 4) / 3;
-    if (h > area.h) { h = area.h; w = (h * 3) / 4; }
-    return { w: Math.round(w), h: Math.round(h) };
+    return { w: Math.round(w * FRAME_SCALE), h: Math.round(h * FRAME_SCALE) };
   }, [area, isLandscape]);
 
   const flip = () => setFacing((f) => (f === 'back' ? 'front' : 'back'));
@@ -112,19 +128,10 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
     try {
       const photo = await camRef.current.takePictureAsync({ quality: 1, skipProcessing: false });
       if (photo && photo.uri) {
-        // Make the camera asset look like a library asset (baked orientation +
-        // matching dims) so the identical cropper — which works for library
-        // imports — handles it correctly.
-        const prepared = await prepareCameraPhoto(photo.uri, photo.width, photo.height);
-        // TEMPORARY DIAGNOSTIC — tells us whether the capture's field of view
-        // and aspect match the viewfinder box the user framed in.
-        console.log('[TFL capture]', JSON.stringify({
-          raw: { w: photo.width, h: photo.height },
-          prepared: { w: prepared && prepared.width, h: prepared && prepared.height },
-          viewfinder: frameBox,
-        }));
+        // Straight to storage — no cropper in this path.
+        const stored = await captureAndPersist(photo.uri, photo.width, photo.height);
         setBusy(false);
-        onCapture(prepared || { uri: photo.uri, width: photo.width, height: photo.height });
+        onCapture(stored);
       } else {
         setBusy(false);
       }
@@ -137,8 +144,15 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   const granted = !!(permission && permission.granted);
   const canShoot = granted && ready && !busy && !isLandscape;
 
+  // Sideways: label first (screen-left of the button = "below" it once turned),
+  // rotated a quarter turn so it only reads upright after you rotate.
   const shutter = granted ? (
     <View style={isLandscape ? s.shutterCol : s.shutterRow}>
+      {isLandscape && (
+        <View style={s.hintSlot}>
+          <Text style={s.hintRotated}>Rotate to capture</Text>
+        </View>
+      )}
       <Pressable
         onPress={shoot}
         disabled={!canShoot}
@@ -147,7 +161,6 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
       >
         <View style={s.shutterInner} />
       </Pressable>
-      {isLandscape && <Text style={s.shutterHint}>Rotate to capture</Text>}
     </View>
   ) : null;
 
@@ -165,11 +178,9 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
           </View>
 
           <View style={[s.body, isLandscape && s.bodyRow]} onLayout={onBodyLayout}>
-            {/* Sideways, the shutter sits to the LEFT of the frame — where
-                "below the viewfinder" ends up once the device is turned. */}
             {isLandscape && shutter}
 
-            <View style={s.area} onLayout={onAreaLayout}>
+            <View style={[s.area, !isLandscape && { paddingTop: PORTRAIT_TOP_PAD }]} onLayout={onAreaLayout}>
               {!granted ? (
                 <View style={s.denied}>
                   <Text style={s.deniedTitle}>Camera access needed</Text>
@@ -210,6 +221,8 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
               )}
             </View>
 
+            {/* Mirrors the shutter column so the frame stays screen-centred. */}
+            {isLandscape && <View style={s.colSpacer} />}
             {!isLandscape && shutter}
           </View>
         </SafeAreaView>
@@ -231,12 +244,11 @@ function makeStyles(t) {
     flipTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     // Column when upright (frame above, shutter below); row when sideways
-    // (shutter left, frame right).
+    // (shutter left, frame centre, spacer right).
     body: { flex: 1, flexDirection: 'column' },
     bodyRow: { flexDirection: 'row', alignItems: 'stretch' },
 
-    // Viewfinder area. 3:4 portrait when upright, 4:3 wide when sideways.
-    area: { flex: 1, paddingHorizontal: 18, paddingTop: 2, alignItems: 'center', justifyContent: 'center' },
+    area: { flex: 1, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
     frame: {
       borderRadius: 16, overflow: 'hidden',
       backgroundColor: '#000', borderWidth: 1.5, borderColor: t.iconBorder,
@@ -247,11 +259,11 @@ function makeStyles(t) {
     turnPanel: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: '#000',
-      alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28,
+      alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24,
     },
-    turnGlyph: { fontSize: t.uit(34), color: '#fff', marginBottom: 10 },
-    turnTitle: { fontSize: t.uit(18), fontWeight: '700', color: '#fff', textAlign: 'center' },
-    turnSub: { fontSize: t.uit(13), color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 6 },
+    turnGlyph: { fontSize: t.uit(32), color: '#fff', marginBottom: 10 },
+    turnTitle: { fontSize: t.uit(17), fontWeight: '700', color: '#fff', textAlign: 'center' },
+    turnSub: { fontSize: t.uit(12), color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 6 },
 
     busyOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -269,12 +281,23 @@ function makeStyles(t) {
     ctaTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
     shutterRow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 22 },
-    shutterCol: { width: 132, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+    shutterCol: {
+      width: SHUTTER_COL_W, flexDirection: 'row',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    colSpacer: { width: SHUTTER_COL_W },
+    // The rotated label lays out at its natural width inside a narrow slot; the
+    // quarter turn then makes it tall and thin. Overflow past the slot is fine.
+    hintSlot: { width: 34, height: 170, alignItems: 'center', justifyContent: 'center' },
+    hintRotated: {
+      width: 170, textAlign: 'center',
+      fontSize: t.uit(13), fontWeight: '600', color: t.muted,
+      transform: [{ rotate: '90deg' }],
+    },
     shutterOuter: {
       width: 74, height: 74, borderRadius: 999, borderWidth: 4, borderColor: t.iconBorder,
       alignItems: 'center', justifyContent: 'center',
     },
     shutterInner: { width: 58, height: 58, borderRadius: 999, backgroundColor: t.tabIdleBg },
-    shutterHint: { marginTop: 12, fontSize: t.uit(13), fontWeight: '600', color: t.muted, textAlign: 'center' },
   });
 }

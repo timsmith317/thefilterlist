@@ -1,3 +1,5 @@
+// File: app/filter/[id].js → ~/Projects/thefilterlist/app/filter/[id].js
+//
 // app/filter/[id].js — Filter Detail.
 //
 // The FILTER now owns the replacement interval (the manufacturer's recommended
@@ -144,16 +146,20 @@ export default function FilterDetail() {
       setCameraOpen(true);
       return;
     }
-    // Library import → asset → custom cropper.
+    // Library import → asset → custom cropper (the only path that still uses it).
     const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
   };
 
-  // Camera modal captured a photo → hand its asset to the cropper.
-  const onCameraCaptured = (asset) => {
+  // Camera path: the modal already persisted the photo. Straight into the filter
+  // — no cropper. The viewfinder was the crop.
+  const onCameraCaptured = async (stored) => {
     setCameraOpen(false);
-    if (asset) setCropAsset(asset);
+    if (!stored) return;
+    const next = addFilterPhoto(data, filter.id, stored);
+    setData(next);
+    await saveData(next);
   };
 
   // Cropper produced a stored filename → add to the filter.
