@@ -35,9 +35,10 @@
 //   the Pixel Tablet in this RN / react-native-screens version — the capture UI
 //   stayed upright in landscape and capture went through anyway.
 //
-// LAYOUT: the frame and the shutter are ONE centred group, not two things at
-// opposite ends of the screen. That's what keeps the button snug against the
-// viewfinder now that FRAME_SCALE shrinks the frame — the leftover space falls
+// LAYOUT: the viewfinder is full-bleed on a phone and pulled in on a tablet
+// (see PHONE_FRAME_SCALE / TABLET_FRAME_SCALE). The frame and the shutter are
+// ONE centred group, not two things at opposite ends of the screen. That's what keeps the button snug against the
+// viewfinder wherever the scale shrinks the frame — the leftover space falls
 // outside the group instead of opening a gap inside it. A spacer mirrors the
 // shutter column when sideways so the frame still lands screen-centred.
 //
@@ -62,7 +63,13 @@ import { captureAndPersist } from '../lib/filterPhotos';
 const HEADER_TOP_PAD = 44;
 
 // Fraction of the largest fitting box the viewfinder actually uses.
-const FRAME_SCALE = 0.7;
+// A phone screen has little enough room that the viewfinder should simply take
+// what's available — 70% of a small screen reads as cramped. A tablet has space
+// to spare, where a full-bleed frame reads as overwhelming rather than generous,
+// so it gets pulled in. Keyed off t.isTablet (device class), NOT Platform.OS:
+// an iPad should behave like the Pixel Tablet, not like an iPhone.
+const PHONE_FRAME_SCALE = 1;
+const TABLET_FRAME_SCALE = 0.7;
 // Width of the shutter column when sideways (mirrored as a spacer on the right
 // so the frame stays screen-centred).
 const SHUTTER_COL_W = 150;
@@ -107,6 +114,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   };
 
   const isLandscape = body.w > 0 && body.w > body.h;
+  const frameScale = t.isTablet ? TABLET_FRAME_SCALE : PHONE_FRAME_SCALE;
 
   // The camera is torn down when we go sideways, so it will re-initialise on the
   // way back to portrait — clear ready so the shutter waits for it.
@@ -115,34 +123,42 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   }, [isLandscape]);
 
   // Largest 3:4 box that fits when upright; largest 4:3 box when sideways —
-  // scaled down by FRAME_SCALE so it reads as a viewfinder, not a wall. The
+  // scaled by frameScale (full on a phone, pulled in on a tablet). The
   // final clamp only bites on a small screen where the scaled frame plus the
   // shutter wouldn't fit; on the tablet it never fires, so the size you approved
   // is unchanged.
   const frameBox = useMemo(() => {
     if (!area.w || !area.h) return { w: 0, h: 0 };
+    // area.h is the view's OUTER height; the portrait top padding eats into what
+    // children actually get, so discount it before fitting.
+    const availW = area.w;
+    const availH = area.h - (isLandscape ? 0 : PORTRAIT_TOP_PAD);
+
     let w, h;
     if (isLandscape) {
-      h = area.h;
+      h = availH;
       w = (h * 4) / 3;
-      if (w > area.w) { w = area.w; h = (w * 3) / 4; }
+      if (w > availW) { w = availW; h = (w * 3) / 4; }
     } else {
-      w = area.w;
+      w = availW;
       h = (w * 4) / 3;
-      if (h > area.h) { h = area.h; w = (h * 3) / 4; }
+      if (h > availH) { h = availH; w = (h * 3) / 4; }
     }
-    w *= FRAME_SCALE;
-    h *= FRAME_SCALE;
+    w *= frameScale;
+    h *= frameScale;
 
+    // Leave room for the shutter beside (sideways) or below (upright) the frame.
+    // On a phone at full scale this clamp is what actually sets the size — the
+    // frame grows until the shutter needs the space, which is the intent.
     if (isLandscape) {
-      const maxW = area.w - 2 * (SHUTTER_COL_W + FRAME_GAP);
+      const maxW = availW - 2 * (SHUTTER_COL_W + FRAME_GAP);
       if (maxW > 0 && w > maxW) { w = maxW; h = (w * 3) / 4; }
     } else {
-      const maxH = area.h - (SHUTTER_BLOCK + FRAME_GAP);
+      const maxH = availH - (SHUTTER_BLOCK + FRAME_GAP);
       if (maxH > 0 && h > maxH) { h = maxH; w = (h * 3) / 4; }
     }
     return { w: Math.round(w), h: Math.round(h) };
-  }, [area, isLandscape]);
+  }, [area, isLandscape, frameScale]);
 
   const flip = () => setFacing((f) => (f === 'back' ? 'front' : 'back'));
 
