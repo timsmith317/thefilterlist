@@ -1,22 +1,40 @@
-// components/CameraCaptureModal.js — in-app camera capture in the app's framed
-// style, built on expo-camera (CameraView). Replaces the earlier
-// react-native-vision-camera modal (whose preview and capture disagreed) and
-// the native-OS-camera detour.
+// File: components/CameraCaptureModal.js → ~/Projects/thefilterlist/components/CameraCaptureModal.js
 //
-// KEY DESIGN:
-//   The viewfinder is a 3:4 portrait frame the camera preview FILLS (overflow
-//   clipped). It's a rough aim — the capture grabs the full sensor frame, and the
-//   final 3:4 is chosen in the PhotoCropper afterward (pinch/zoom/pan on a 3:4
-//   frame). The cropper GUARANTEES 3:4 output regardless of how the device was
-//   held, so every saved photo fills the 3:4 strip slot uniformly. We do NOT lock
-//   orientation — expo-screen-orientation's portrait lock is unreliable in this
-//   RN/react-native-screens version (a documented bug), and guaranteeing 3:4 in
-//   the cropper makes the lock unnecessary anyway.
+// components/CameraCaptureModal.js — in-app camera capture in the app's framed
+// style, built on expo-camera (CameraView).
+//
+// PORTRAIT-ONLY CAPTURE (the decision that ends the orientation fight):
+//   Every photo is captured with the device held UPRIGHT. That is the whole
+//   design. A portrait capture produces a portrait sensor frame, which is
+//   already 3:4 — so the viewfinder matches the capture, the cropper opens on
+//   what was framed, and the 3:4 strip slot fills with no bars. Landscape
+//   capture was the single variable that broke all three, so it is removed
+//   rather than compensated for.
+//
+//   HOW IT'S ENFORCED — in JS, not by an OS orientation lock:
+//     - The modal measures its own box. If it's wider than tall, the device is
+//       being held sideways.
+//     - In landscape the viewfinder renders as a WIDE 4:3 frame with the live
+//       preview ROTATED 90°, so the scene appears on its side. It reads as
+//       obviously wrong, which is the cue to turn the device.
+//     - The shutter is DISABLED while sideways, with an explicit prompt. This
+//       is the load-bearing part: capture simply cannot happen in landscape.
+//     - Turn the device upright and everything snaps to the normal portrait
+//       3:4 viewfinder with a live shutter. No prebuild, no native module.
+//
+//   WHY NOT expo-screen-orientation: its portrait lockAsync did not engage on
+//   the Pixel Tablet in this RN / react-native-screens version — the capture UI
+//   stayed upright in landscape and capture went through anyway. A measured
+//   layout can't fail that way, and it drops a native dependency.
+//
+// The capture still grabs the full sensor frame and the final 3:4 is chosen in
+// the PhotoCropper afterward (pinch/zoom/pan on a 3:4 frame). Portrait-only
+// capture is what makes that frame reachable without guessing.
 //
 // expo-camera is a native module — needs a dev rebuild. Preview does NOT render
 // in Mac screen-mirroring; test on a physical device.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -33,7 +51,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   const [facing, setFacing] = useState('back');
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const [frameBox, setFrameBox] = useState({ w: 0, h: 0 });
+  const [area, setArea] = useState({ w: 0, h: 0 });
 
   // Ask for camera permission when the sheet opens.
   useEffect(() => {
@@ -43,27 +61,61 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
     if (!visible) { setReady(false); setBusy(false); }
   }, [visible, permission]);
 
-  // Fit the largest 3:4 PORTRAIT rectangle into the available area.
+  // Measure the viewfinder AREA rather than reading Dimensions: this is the
+  // actual laid-out box inside the Modal, so it is correct on both platforms
+  // and updates on every rotation without a listener.
   const onAreaLayout = (e) => {
     const { width, height } = e.nativeEvent.layout;
     if (width <= 0 || height <= 0) return;
-    let w = width;
-    let h = (w * 4) / 3;          // 3:4 portrait
-    if (h > height) { h = height; w = (h * 3) / 4; }
-    setFrameBox({ w: Math.round(w), h: Math.round(h) });
+    setArea({ w: width, h: height });
   };
+
+  // Device held sideways?
+  const isLandscape = area.w > 0 && area.w > area.h;
+
+  // Largest 3:4 box that fits when upright; largest 4:3 box when sideways. The
+  // sideways frame is deliberately WIDE — it is the shape of the screen you are
+  // holding, and the rotated preview inside it is what signals "turn me".
+  const frameBox = useMemo(() => {
+    if (!area.w || !area.h) return { w: 0, h: 0 };
+    if (isLandscape) {
+      let h = area.h;
+      let w = (h * 4) / 3;
+      if (w > area.w) { w = area.w; h = (w * 3) / 4; }
+      return { w: Math.round(w), h: Math.round(h) };
+    }
+    let w = area.w;
+    let h = (w * 4) / 3;
+    if (h > area.h) { h = area.h; w = (h * 3) / 4; }
+    return { w: Math.round(w), h: Math.round(h) };
+  }, [area, isLandscape]);
+
+  // While sideways, the preview lives in a box with WIDTH and HEIGHT SWAPPED,
+  // rotated 90° about its centre. Offsetting by half the difference centres the
+  // swapped box inside the frame before the rotation lands it flush.
+  const rotatedPreview = useMemo(() => {
+    if (!isLandscape || !frameBox.w) return null;
+    return {
+      width: frameBox.h,
+      height: frameBox.w,
+      left: (frameBox.w - frameBox.h) / 2,
+      top: (frameBox.h - frameBox.w) / 2,
+    };
+  }, [isLandscape, frameBox]);
 
   const flip = () => setFacing((f) => (f === 'back' ? 'front' : 'back'));
 
   const shoot = async () => {
-    if (busy || !camRef.current || !ready) return;
+    // Portrait-only: the sideways guard is here as well as on the button, so no
+    // code path can capture a landscape frame.
+    if (busy || isLandscape || !camRef.current || !ready) return;
     setBusy(true);
     try {
       const photo = await camRef.current.takePictureAsync({ quality: 1, skipProcessing: false });
       if (photo && photo.uri) {
         // Make the camera asset look like a library asset (baked orientation +
         // matching dims) so the identical cropper — which works for library
-        // imports — handles it correctly. Both platforms.
+        // imports — handles it correctly.
         const prepared = await prepareCameraPhoto(photo.uri, photo.width, photo.height);
         setBusy(false);
         onCapture(prepared || { uri: photo.uri, width: photo.width, height: photo.height });
@@ -77,6 +129,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   };
 
   const granted = !!(permission && permission.granted);
+  const canShoot = granted && ready && !busy && !isLandscape;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
@@ -84,7 +137,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
         <SafeAreaView style={s.safe} edges={['bottom']}>
           <View style={s.head}>
             <BackButton onPress={onCancel} />
-            {granted && (
+            {granted && !isLandscape && (
               <Pressable onPress={flip} hitSlop={10} style={s.flipBtn}>
                 <Text style={s.flipTxt}>Flip</Text>
               </Pressable>
@@ -108,12 +161,47 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
               </View>
             ) : (
               <View style={[s.frame, frameBox.w > 0 && { width: frameBox.w, height: frameBox.h }]}>
-                <CameraView
-                  ref={camRef}
-                  style={StyleSheet.absoluteFill}
-                  facing={facing}
-                  onCameraReady={() => setReady(true)}
-                />
+                {rotatedPreview ? (
+                  // SIDEWAYS: swapped-size box, rotated 90°, so the scene shows
+                  // on its side inside a wide frame.
+                  <View
+                    style={[
+                      s.rotatedLayer,
+                      {
+                        width: rotatedPreview.width,
+                        height: rotatedPreview.height,
+                        left: rotatedPreview.left,
+                        top: rotatedPreview.top,
+                      },
+                    ]}
+                    pointerEvents="none"
+                  >
+                    <CameraView
+                      ref={camRef}
+                      style={StyleSheet.absoluteFill}
+                      facing={facing}
+                      onCameraReady={() => setReady(true)}
+                    />
+                  </View>
+                ) : (
+                  <CameraView
+                    ref={camRef}
+                    style={StyleSheet.absoluteFill}
+                    facing={facing}
+                    onCameraReady={() => setReady(true)}
+                  />
+                )}
+
+                {isLandscape && (
+                  <View style={s.turnOverlay} pointerEvents="none">
+                    <View style={s.turnCard}>
+                      <Text style={s.turnGlyph}>⤾</Text>
+                      <Text style={s.turnTitle}>Turn your device upright</Text>
+                      <Text style={s.turnSub}>Photos are captured in portrait so they fill the frame.</Text>
+                    </View>
+                  </View>
+                )}
+
                 {busy && (
                   <View style={s.busyOverlay} pointerEvents="none"><ActivityIndicator color="#fff" /></View>
                 )}
@@ -123,9 +211,17 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
 
           <View style={s.shutterRow}>
             {granted && (
-              <Pressable onPress={shoot} disabled={busy || !ready} hitSlop={10} style={[s.shutterOuter, (busy || !ready) && { opacity: 0.5 }]}>
-                <View style={s.shutterInner} />
-              </Pressable>
+              <>
+                <Pressable
+                  onPress={shoot}
+                  disabled={!canShoot}
+                  hitSlop={10}
+                  style={[s.shutterOuter, !canShoot && { opacity: 0.35 }]}
+                >
+                  <View style={s.shutterInner} />
+                </Pressable>
+                {isLandscape && <Text style={s.shutterHint}>Rotate to portrait to capture</Text>}
+              </>
             )}
           </View>
         </SafeAreaView>
@@ -146,13 +242,31 @@ function makeStyles(t) {
     flipBtn: { backgroundColor: t.tabIdleBg, paddingHorizontal: t.ui(14), paddingVertical: t.ui(7), borderRadius: 999 },
     flipTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
-    // 3:4 portrait viewfinder, centered in the available area.
+    // Viewfinder area. 3:4 portrait when upright, 4:3 wide when sideways.
     area: { flex: 1, paddingHorizontal: 18, paddingTop: 2, alignItems: 'center', justifyContent: 'center' },
     frame: {
       borderRadius: 16, overflow: 'hidden',
       backgroundColor: '#000', borderWidth: 1.5, borderColor: t.iconBorder,
       alignItems: 'center', justifyContent: 'center',
     },
+    // Swapped-dimension layer, rotated a quarter turn. Absolutely positioned so
+    // the offsets computed above centre it inside the wide frame.
+    rotatedLayer: { position: 'absolute', transform: [{ rotate: '90deg' }] },
+
+    turnOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    turnCard: {
+      alignItems: 'center', justifyContent: 'center',
+      paddingHorizontal: 26, paddingVertical: 20,
+      borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    turnGlyph: { fontSize: t.uit(34), color: '#fff', marginBottom: 8 },
+    turnTitle: { fontSize: t.uit(17), fontWeight: '700', color: '#fff', textAlign: 'center' },
+    turnSub: { fontSize: t.uit(13), color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 6 },
+
     busyOverlay: {
       ...StyleSheet.absoluteFillObject,
       alignItems: 'center', justifyContent: 'center',
@@ -174,5 +288,6 @@ function makeStyles(t) {
       alignItems: 'center', justifyContent: 'center',
     },
     shutterInner: { width: 58, height: 58, borderRadius: 999, backgroundColor: t.tabIdleBg },
+    shutterHint: { marginTop: 10, fontSize: t.uit(13), fontWeight: '600', color: t.muted },
   });
 }
