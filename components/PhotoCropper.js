@@ -1,3 +1,5 @@
+// File: components/PhotoCropper.js → ~/Projects/thefilterlist/components/PhotoCropper.js
+//
 // components/PhotoCropper.js — pinch-zoom-pan cropper for Filter reference
 // photos. Replaces iOS's built-in "Move and Scale" editor, which is square-fill
 // only (zoom IN only). Here userScale starts at 1 = the WHOLE image fit inside
@@ -24,6 +26,15 @@ import { useTheme } from '../theme/theme';
 import { BackButton, PillButton } from './HeaderBits';
 import { baseScaleFor, clampPan, computeCropRect, frameHeightFor, fitWidthScale } from '../lib/cropmath';
 import { cropAndPersist } from '../lib/filterPhotos';
+
+// Distance from the top of the sheet to the header row. These modals use
+// SafeAreaView edges={['bottom']} — the TOP inset is deliberately not applied,
+// because inside an iOS pageSheet the reported top inset is the window's, not
+// the sheet's, and using it over-pads on iPhone. So the clearance is an explicit
+// constant instead. 44 clears the tablet's sheet grabber, which 14 did not.
+// Keep this identical in PhotoCropper and CameraCaptureModal so the two screens
+// line up as you move between them.
+const HEADER_TOP_PAD = 44;
 
 const MAX_SCALE = 6;
 // Users can zoom OUT below the auto-fit (cover) start to see the whole photo,
@@ -168,7 +179,7 @@ function makeStyles(t) {
 
     head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
+      paddingHorizontal: 18, paddingTop: HEADER_TOP_PAD, paddingBottom: 10,
     },
 
     area: { flex: 1, alignItems: 'center', justifyContent: 'center' },

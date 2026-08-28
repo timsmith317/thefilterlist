@@ -35,10 +35,11 @@
 //   the Pixel Tablet in this RN / react-native-screens version — the capture UI
 //   stayed upright in landscape and capture went through anyway.
 //
-// SIZING: FRAME_SCALE trims the viewfinder off the largest box that would fit.
-// Full-bleed reads as overwhelming on a tablet; a smaller centred frame reads as
-// a viewfinder. The frame is centred on SCREEN in both orientations — sideways,
-// a spacer mirrors the shutter column so the shutter doesn't push it off-centre.
+// LAYOUT: the frame and the shutter are ONE centred group, not two things at
+// opposite ends of the screen. That's what keeps the button snug against the
+// viewfinder now that FRAME_SCALE shrinks the frame — the leftover space falls
+// outside the group instead of opening a gap inside it. A spacer mirrors the
+// shutter column when sideways so the frame still lands screen-centred.
 //
 // expo-camera is a native module — needs a dev rebuild. Preview does NOT render
 // in Mac screen-mirroring; test on a physical device.
@@ -51,13 +52,25 @@ import { useTheme } from '../theme/theme';
 import { BackButton } from './HeaderBits';
 import { captureAndPersist } from '../lib/filterPhotos';
 
+// Distance from the top of the sheet to the header row. These modals use
+// SafeAreaView edges={['bottom']} — the TOP inset is deliberately not applied,
+// because inside an iOS pageSheet the reported top inset is the window's, not
+// the sheet's, and using it over-pads on iPhone. So the clearance is an explicit
+// constant instead. 44 clears the tablet's sheet grabber, which 14 did not.
+// Keep this identical in PhotoCropper and CameraCaptureModal so the two screens
+// line up as you move between them.
+const HEADER_TOP_PAD = 44;
+
 // Fraction of the largest fitting box the viewfinder actually uses.
 const FRAME_SCALE = 0.7;
 // Width of the shutter column when sideways (mirrored as a spacer on the right
 // so the frame stays screen-centred).
 const SHUTTER_COL_W = 150;
-// Extra breathing room above the frame in portrait, clear of the tablet's
-// status/handle chrome at the top of the sheet.
+// Space between the frame and the shutter, on whichever side it sits.
+const FRAME_GAP = 18;
+// Vertical room the shutter needs below the frame in portrait (button + slack).
+const SHUTTER_BLOCK = 96;
+// Extra breathing room above the frame in portrait.
 const PORTRAIT_TOP_PAD = 28;
 
 export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
@@ -102,7 +115,10 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   }, [isLandscape]);
 
   // Largest 3:4 box that fits when upright; largest 4:3 box when sideways —
-  // then scaled down by FRAME_SCALE so it reads as a viewfinder, not a wall.
+  // scaled down by FRAME_SCALE so it reads as a viewfinder, not a wall. The
+  // final clamp only bites on a small screen where the scaled frame plus the
+  // shutter wouldn't fit; on the tablet it never fires, so the size you approved
+  // is unchanged.
   const frameBox = useMemo(() => {
     if (!area.w || !area.h) return { w: 0, h: 0 };
     let w, h;
@@ -115,7 +131,17 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
       h = (w * 4) / 3;
       if (h > area.h) { h = area.h; w = (h * 3) / 4; }
     }
-    return { w: Math.round(w * FRAME_SCALE), h: Math.round(h * FRAME_SCALE) };
+    w *= FRAME_SCALE;
+    h *= FRAME_SCALE;
+
+    if (isLandscape) {
+      const maxW = area.w - 2 * (SHUTTER_COL_W + FRAME_GAP);
+      if (maxW > 0 && w > maxW) { w = maxW; h = (w * 3) / 4; }
+    } else {
+      const maxH = area.h - (SHUTTER_BLOCK + FRAME_GAP);
+      if (maxH > 0 && h > maxH) { h = maxH; w = (h * 3) / 4; }
+    }
+    return { w: Math.round(w), h: Math.round(h) };
   }, [area, isLandscape]);
 
   const flip = () => setFacing((f) => (f === 'back' ? 'front' : 'back'));
@@ -145,7 +171,8 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
   const canShoot = granted && ready && !busy && !isLandscape;
 
   // Sideways: label first (screen-left of the button = "below" it once turned),
-  // rotated a quarter turn so it only reads upright after you rotate.
+  // rotated a quarter turn so it only reads upright after you rotate. The column
+  // is right-aligned so the button hugs the frame rather than floating.
   const shutter = granted ? (
     <View style={isLandscape ? s.shutterCol : s.shutterRow}>
       {isLandscape && (
@@ -177,9 +204,7 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
             )}
           </View>
 
-          <View style={[s.body, isLandscape && s.bodyRow]} onLayout={onBodyLayout}>
-            {isLandscape && shutter}
-
+          <View style={s.body} onLayout={onBodyLayout}>
             <View style={[s.area, !isLandscape && { paddingTop: PORTRAIT_TOP_PAD }]} onLayout={onAreaLayout}>
               {!granted ? (
                 <View style={s.denied}>
@@ -196,34 +221,40 @@ export default function CameraCaptureModal({ visible, onCancel, onCapture }) {
                   )}
                 </View>
               ) : (
-                <View style={[s.frame, frameBox.w > 0 && { width: frameBox.w, height: frameBox.h }]}>
-                  {isLandscape ? (
-                    // Camera deliberately NOT mounted — see the SurfaceView note
-                    // at the top. A plain black panel, so nothing shows through.
-                    <View style={s.turnPanel}>
-                      <Text style={s.turnGlyph}>⤾</Text>
-                      <Text style={s.turnTitle}>Turn your device upright</Text>
-                      <Text style={s.turnSub}>Photos are captured in portrait so they fill the frame.</Text>
-                    </View>
-                  ) : (
-                    <CameraView
-                      ref={camRef}
-                      style={StyleSheet.absoluteFill}
-                      facing={facing}
-                      onCameraReady={() => setReady(true)}
-                    />
-                  )}
+                // Frame + shutter as one centred group, so the leftover space
+                // sits outside the pair instead of between them.
+                <View style={[s.group, isLandscape && s.groupRow]}>
+                  {isLandscape && shutter}
 
-                  {busy && (
-                    <View style={s.busyOverlay} pointerEvents="none"><ActivityIndicator color="#fff" /></View>
-                  )}
+                  <View style={[s.frame, frameBox.w > 0 && { width: frameBox.w, height: frameBox.h }]}>
+                    {isLandscape ? (
+                      // Camera deliberately NOT mounted — see the SurfaceView
+                      // note above. A plain black panel, so nothing shows through.
+                      <View style={s.turnPanel}>
+                        <Text style={s.turnGlyph}>⤾</Text>
+                        <Text style={s.turnTitle}>Turn your device upright</Text>
+                        <Text style={s.turnSub}>Photos are captured in portrait so they fill the frame.</Text>
+                      </View>
+                    ) : (
+                      <CameraView
+                        ref={camRef}
+                        style={StyleSheet.absoluteFill}
+                        facing={facing}
+                        onCameraReady={() => setReady(true)}
+                      />
+                    )}
+
+                    {busy && (
+                      <View style={s.busyOverlay} pointerEvents="none"><ActivityIndicator color="#fff" /></View>
+                    )}
+                  </View>
+
+                  {/* Mirrors the shutter column so the frame stays centred. */}
+                  {isLandscape && <View style={s.colSpacer} />}
+                  {!isLandscape && shutter}
                 </View>
               )}
             </View>
-
-            {/* Mirrors the shutter column so the frame stays screen-centred. */}
-            {isLandscape && <View style={s.colSpacer} />}
-            {!isLandscape && shutter}
           </View>
         </SafeAreaView>
       </View>
@@ -238,17 +269,18 @@ function makeStyles(t) {
 
     head: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
+      paddingHorizontal: 18, paddingTop: HEADER_TOP_PAD, paddingBottom: 10,
     },
     flipBtn: { backgroundColor: t.tabIdleBg, paddingHorizontal: t.ui(14), paddingVertical: t.ui(7), borderRadius: 999 },
     flipTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
-    // Column when upright (frame above, shutter below); row when sideways
-    // (shutter left, frame centre, spacer right).
-    body: { flex: 1, flexDirection: 'column' },
-    bodyRow: { flexDirection: 'row', alignItems: 'stretch' },
-
+    body: { flex: 1 },
     area: { flex: 1, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
+
+    // The frame and shutter travel together and are centred as a unit.
+    group: { alignItems: 'center', justifyContent: 'center' },
+    groupRow: { flexDirection: 'row' },
+
     frame: {
       borderRadius: 16, overflow: 'hidden',
       backgroundColor: '#000', borderWidth: 1.5, borderColor: t.iconBorder,
@@ -280,12 +312,15 @@ function makeStyles(t) {
     cta: { backgroundColor: t.tabIdleBg, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999 },
     ctaTxt: { color: t.ink, fontSize: t.uit(14), fontWeight: '700' },
 
-    shutterRow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 22 },
+    // Upright: directly beneath the frame, one gap away.
+    shutterRow: { alignItems: 'center', justifyContent: 'center', marginTop: FRAME_GAP },
+    // Sideways: right-aligned in its column so the button hugs the frame's edge.
     shutterCol: {
       width: SHUTTER_COL_W, flexDirection: 'row',
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'flex-end',
+      marginRight: FRAME_GAP,
     },
-    colSpacer: { width: SHUTTER_COL_W },
+    colSpacer: { width: SHUTTER_COL_W, marginLeft: FRAME_GAP },
     // The rotated label lays out at its natural width inside a narrow slot; the
     // quarter turn then makes it tall and thin. Overflow past the slot is fine.
     hintSlot: { width: 34, height: 170, alignItems: 'center', justifyContent: 'center' },
