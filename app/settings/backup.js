@@ -1,3 +1,5 @@
+// File: app/settings/backup.js → ~/Projects/thefilterlist/app/settings/backup.js
+//
 // app/settings/backup.js
 //
 // Backup & Restore screen.
@@ -16,6 +18,13 @@
 // all data" warning lives in the preview modal + the destructive Alert,
 // NOT on the main Restore card — the warning fires at the moment of
 // action, where it actually matters.
+//
+// ERROR SURFACING: every async handler here has a catch, not just a finally.
+// Without one, anything thrown inside pickBackupFile / readAndValidateBackup /
+// applyRestore became an unhandled rejection: the spinner stopped, no dialog
+// appeared, and the user saw the picker close and nothing happen. A silent
+// failure in a destructive-data flow is the worst kind, so failures now name
+// themselves.
 //
 // Delete Sample Data:
 //   Fresh installs seed demo data (see data/store.js seed()). This screen
@@ -93,6 +102,9 @@ export default function BackupSettings() {
         // friendly message rather than the raw error.
         Alert.alert('Share Failed', String(e?.message || e));
       }
+    } catch (e) {
+      console.warn('[TFL backup] export threw', e);
+      Alert.alert('Export Failed', String(e?.message || e));
     } finally {
       setExporting(false);
     }
@@ -102,8 +114,14 @@ export default function BackupSettings() {
     try {
       setPicking(true);
       const fileUri = await pickBackupFile();
-      if (!fileUri) return; // user cancelled
+      console.log('[TFL restore] picked:', fileUri);
+      if (!fileUri) return; // user cancelled, or the picker returned nothing
       const result = await readAndValidateBackup(fileUri);
+      console.log('[TFL restore] validate:', JSON.stringify({
+        ok: result && result.ok,
+        reason: result && result.reason,
+        stats: result && result.stats,
+      }));
       if (!result.ok) {
         if (result.reason === 'invalid') {
           Alert.alert(
@@ -116,6 +134,9 @@ export default function BackupSettings() {
         return;
       }
       setPreview(result);
+    } catch (e) {
+      console.warn('[TFL restore] pick/validate threw', e);
+      Alert.alert('Restore Failed', String(e?.message || e));
     } finally {
       setPicking(false);
     }
@@ -155,6 +176,9 @@ export default function BackupSettings() {
           'Could not save the restored data. Your current data has not been changed.'
         );
       }
+    } catch (e) {
+      console.warn('[TFL restore] applyRestore threw', e);
+      Alert.alert('Restore Failed', String(e?.message || e));
     } finally {
       setRestoring(false);
     }
