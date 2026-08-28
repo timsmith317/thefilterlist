@@ -24,11 +24,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/theme';
 import { BackButton, PillButton } from './HeaderBits';
 import { photoUri, saveToPhotos } from '../lib/filterPhotos';
+import { frameHeightFor } from '../lib/cropmath';
 
 export default function PhotoViewerModal({ visible, photos = [], index = 0, onClose }) {
   const t = useTheme();
   const s = makeStyles(t);
-  const [side, setSide] = useState(0);   // square frame side (px)
+  const [side, setSide] = useState(0);   // frame WIDTH (px); height is 3:4
   const [cur, setCur] = useState(index);
   const [busy, setBusy] = useState(false);
   const pagerRef = useRef(null);
@@ -38,20 +39,23 @@ export default function PhotoViewerModal({ visible, photos = [], index = 0, onCl
     if (visible) setCur(index);
   }, [visible, index]);
 
-  // Snap the pager to the REQUESTED photo when the viewer opens (and once the
-  // frame size is known).
-  //
-  // This must scroll to `index`, NOT `cur`. Both effects run in the same pass
-  // when the viewer opens, so reading `cur` here would see the PREVIOUS
-  // session's page (the reset above hasn't applied yet) — which was the
-  // "always reopens on the last photo I swiped to" bug. `index` is the source
-  // of truth for "what was tapped," and it only changes while the viewer is
-  // closed, so this never fights an in-progress swipe.
+  // Track the previous frame width so we can tell a ROTATION (side changed while
+  // already open) apart from the initial open.
+  const prevLayoutW = useRef(0);
+
+  // OPEN snap: when the viewer opens (and once side is known), jump to the
+  // REQUESTED photo `index` — NOT `cur`, which on open still holds the previous
+  // session's page (the reset effect above hasn't applied yet). This is the
+  // "reopens on the last photo I swiped to" guard.
   useEffect(() => {
     if (visible && side > 0 && pagerRef.current) {
       pagerRef.current.scrollTo({ x: index * side, y: 0, animated: false });
     }
-  }, [visible, side, index]);
+  }, [visible, index]);
+
+  // NOTE: the rotation re-snap is handled by the pager's onLayout (below), which
+  // fires exactly when the ScrollView resizes — the definitive signal, with no
+  // frame-timing guesswork. See onLayout on the horizontal pager.
 
   const onMomentumEnd = (e) => {
     if (!side) return;
@@ -67,6 +71,11 @@ export default function PhotoViewerModal({ visible, photos = [], index = 0, onCl
     if (ok) Alert.alert('Saved', 'Photo saved to your library.');
   };
 
+  // Round the 3:4 height ONCE so the frame, pager, pages, and image all get the
+  // exact same integer height — otherwise each view rounds the fractional
+  // frameHeightFor(side) independently and a 1-2px gap shows at the bottom.
+  const frameH = Math.round(frameHeightFor(side));
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={s.root}>
@@ -80,37 +89,62 @@ export default function PhotoViewerModal({ visible, photos = [], index = 0, onCl
             style={s.frameWrap}
             onLayout={(e) => {
               const { width, height } = e.nativeEvent.layout;
-              setSide(Math.max(0, Math.min(width, height) - 36));
+              // Fit a 3:4 PORTRAIT frame: width bounded by area width, and its
+              // derived height (w*4/3) bounded by area height.
+              const availW = Math.max(0, width - 36);
+              const availH = Math.max(0, height - 36);
+              const wByHeight = (availH * 3) / 4;
+              setSide(Math.round(Math.min(availW, wByHeight)));
             }}
           >
             {side > 0 && photos.length > 0 && (
-              <View style={[s.frame, { width: side, height: side }]}>
+              // Rounded corners live on this plain WRAPPER View, not on the
+              // ScrollView: a ScrollView clips its scrolling content unevenly
+              // (top corners round, bottom stay square). A non-scrolling View
+              // with borderRadius + overflow hidden clips all four corners
+              // reliably. The pager fills it exactly.
+              <View style={[s.clip, { width: side, height: frameH }]}>
                 <ScrollView
                   ref={pagerRef}
                   horizontal
                   pagingEnabled
-                  // Initial offset for a fresh mount: RN's Modal unmounts its
-                  // children while hidden, so the pager remounts on every open
-                  // at offset 0. This puts it on the tapped photo from the
-                  // first frame — covering the window where an imperative
-                  // scrollTo could land before the native view has measured.
+                  bounces={false}
+                  overScrollMode="never"
+                  style={{ width: side, height: frameH }}
                   contentOffset={{ x: index * side, y: 0 }}
                   showsHorizontalScrollIndicator={false}
                   onMomentumScrollEnd={onMomentumEnd}
+                  onLayout={(e) => {
+                    // Fires when the pager (re)sizes. On a genuine RESIZE — the
+                    // width changed from a known previous value, i.e. rotation —
+                    // snap to the current photo at the new width. This is the
+                    // definitive re-align signal, independent of rAF timing. We
+                    // skip the initial layout (prevLayoutW 0) so we never fight
+                    // the open-snap-to-index with a stale `cur`.
+                    const w = e.nativeEvent.layout.width;
+                    if (prevLayoutW.current && Math.abs(prevLayoutW.current - w) > 1) {
+                      if (pagerRef.current && side > 0) {
+                        pagerRef.current.scrollTo({ x: cur * side, y: 0, animated: false });
+                      }
+                    }
+                    prevLayoutW.current = w;
+                  }}
                 >
                   {photos.map((p, i) => (
                     <ScrollView
                       key={i}
-                      style={{ width: side, height: side }}
-                      contentContainerStyle={{ width: side, height: side }}
+                      style={{ width: side, height: frameH }}
+                      contentContainerStyle={{ width: side, height: frameH }}
                       maximumZoomScale={3}
                       minimumZoomScale={1}
-                      bouncesZoom
+                      bounces={false}
+                      bouncesZoom={false}
+                      overScrollMode="never"
                       centerContent
                       showsVerticalScrollIndicator={false}
                       showsHorizontalScrollIndicator={false}
                     >
-                      <Image source={{ uri: photoUri(p) }} style={{ width: side, height: side }} resizeMode="contain" />
+                      <Image source={{ uri: photoUri(p) }} style={{ width: side, height: frameH }} resizeMode="contain" />
                     </ScrollView>
                   ))}
                 </ScrollView>
@@ -142,10 +176,9 @@ function makeStyles(t) {
     },
 
     frameWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    frame: {
-      borderRadius: 16, overflow: 'hidden',
-      backgroundColor: t.card, borderWidth: 1.5, borderColor: t.iconBorder,
-    },
+    // Plain wrapper that clips the pager to rounded corners (all four, evenly).
+    // Not a ScrollView, so the radius applies uniformly.
+    clip: { borderRadius: 16, overflow: 'hidden' },
 
     dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 18 },
     dot: { width: 7, height: 7, borderRadius: 999, backgroundColor: t.line },

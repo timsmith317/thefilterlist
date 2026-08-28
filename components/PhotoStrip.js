@@ -3,10 +3,9 @@
 // offers Camera / Library. Tapping a filled slot offers Save to Photos /
 // Delete. Caller provides photos array and callbacks; this is pure UI.
 //
-// Thumbnails use resizeMode 'contain' so the WHOLE composed photo shows inside
-// the square slot (a tall device isn't re-cropped). The slot's card background
-// fills any spare space — and matches what the cropper preview shows, so the
-// thumbnail looks like what you framed.
+// Portrait 3:4 slots (96x128) match the 3:4 captured/cropped photos, so
+// photos fill edge-to-edge with no bars. Empty placeholders share the slot
+// shape, so they're 3:4 too.
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet, ActionSheetIOS, Alert, Platform } from 'react-native';
 import { useTheme } from '../theme/theme';
@@ -90,7 +89,7 @@ function makeStyles(t) {
     row: t.isTablet
       ? { flexDirection: 'row', justifyContent: 'flex-start', gap: t.ui(48) }
       : { flexDirection: 'row', justifyContent: 'space-between' },
-    slot: { width: t.ui(96), height: t.ui(96), borderRadius: t.ui(14), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    slot: { width: t.ui(96), height: t.ui(128), borderRadius: t.ui(14), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     slotEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: t.iconBorder, backgroundColor: t.card },
     slotFilled: { backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
     plus: { fontSize: t.uit(30), color: t.muted, fontWeight: '300' },

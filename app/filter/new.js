@@ -104,10 +104,24 @@ export default function NewFilter() {
       Alert.alert('Limit reached', `Up to ${MAX_FILTER_PHOTOS} photos.`);
       return;
     }
-    if (source === 'camera') { setCameraOpen(true); return; }
+    if (source === 'camera') {
+      setCameraOpen(true);
+      return;
+    }
+    // Library import → asset → custom cropper.
     const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
+  };
+
+  const onCameraCaptured = (asset) => {
+    setCameraOpen(false);
+    if (asset) setCropAsset(asset);
+  };
+
+  const onCroppedPhoto = (stored) => {
+    setCropAsset(null);
+    if (stored) setPhotos(prev => [...prev, stored].slice(0, MAX_FILTER_PHOTOS));
   };
   const onSaveToPhotos = async (uri) => {
     const ok = await saveToPhotos(uri);
@@ -189,22 +203,19 @@ export default function NewFilter() {
 
         {fromPicker && <Text style={[s.hint, { marginTop: 16 }]}>This filter will be added to the device you came from.</Text>}
       </KeyboardAwareScrollView>
-
-      <PhotoCropper
+          <PhotoCropper
         visible={!!cropAsset}
         asset={cropAsset}
         onCancel={() => setCropAsset(null)}
-        onDone={(uri) => {
-          if (uri) setPhotos(prev => [...prev, uri].slice(0, MAX_FILTER_PHOTOS));
-          setCropAsset(null);
-        }}
+        onDone={onCroppedPhoto}
       />
 
       <CameraCaptureModal
         visible={cameraOpen}
         onCancel={() => setCameraOpen(false)}
-        onCapture={(asset) => { setCameraOpen(false); setCropAsset(asset); }}
+        onCapture={onCameraCaptured}
       />
+
     </SafeAreaView>
   );
 }

@@ -13,8 +13,10 @@
  * PERMISSIONS — camera + photos only, NO microphone:
  *   This app photographs filters/parts and picks reference images; it never
  *   records audio. Two libraries add native perms:
- *     - react-native-vision-camera (camera capture) — pinned with
- *       enableMicrophonePermission:false; does not add a mic key.
+ *     - expo-image-picker (library picks) — microphonePermission:false so its
+ *       permission plugin omits the mic key.
+ *     - expo-camera (custom capture modal) — photo-only, recordAudioAndroid:false,
+ *       mic permission NOT enabled, so no mic key.
  *     - expo-image-picker (library picks) — Expo AUTO-APPLIES its config plugin
  *       just because the package is installed, and with no options it injects a
  *       default NSMicrophoneUsageDescription. We list it explicitly with
@@ -100,23 +102,12 @@ module.exports = {
     plugins: [
       'expo-router',
       'expo-notifications',
-      // Camera capture (components/CameraCaptureModal). Pinned exactly like
-      // Hanger: no microphone, no location. This plugin does NOT inject a mic
-      // usage string — that's the whole reason we moved off expo-camera.
-      [
-        'react-native-vision-camera',
-        {
-          cameraPermissionText: CAMERA_PERMISSION,
-          enableMicrophonePermission: false,
-          enableLocation: false,
-        },
-      ],
-      // expo-image-picker (library picks via pickFromLibrary). It is auto-applied
-      // by Expo because it's a dependency, and WITHOUT options it injects a
-      // default NSMicrophoneUsageDescription (the mic key we kept seeing). Listed
-      // explicitly here with microphonePermission:false so its permission plugin
-      // OMITS the mic key — image-picker's createPermissionsPlugin treats false as
-      // "remove" (unlike expo-camera, which ignored it). photosPermission/
+      // Camera capture + library picks both go through expo-image-picker now
+      // (native OS camera via launchCameraAsync; library via launchImageLibrary).
+      // WITHOUT options it injects a default NSMicrophoneUsageDescription (the mic
+      // key we don't want); listed explicitly with microphonePermission:false so
+      // its permission plugin OMITS the mic key — image-picker's
+      // createPermissionsPlugin treats false as "remove". photosPermission/
       // cameraPermission strings mirror infoPlist for consistency.
       [
         'expo-image-picker',
@@ -124,6 +115,16 @@ module.exports = {
           photosPermission: PHOTOS_PERMISSION,
           cameraPermission: CAMERA_PERMISSION,
           microphonePermission: false,
+        },
+      ],
+      // expo-camera powers the custom in-app capture modal. Photo-only — we set
+      // recordAudioAndroid:false and do NOT enable the microphone permission, so
+      // no mic key is added (video/audio is never used).
+      [
+        'expo-camera',
+        {
+          cameraPermission: CAMERA_PERMISSION,
+          recordAudioAndroid: false,
         },
       ],
       'expo-file-system',

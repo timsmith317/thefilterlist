@@ -7,10 +7,10 @@
 // Presented as the same themed iOS SHEET (presentationStyle="pageSheet") the
 // photo viewer / pickers use: white background, the photo in a centered framed
 // card, ‹ Back + a standard "Add" PillButton in the header. Only the look
-// changed — the crop frame, gestures, and geometry are unchanged.
+// changed — the crop frame is now 3:4 portrait; gestures/geometry via cropmath.
 //
 // Geometry lives in lib/cropmath.js (pure + unit-tested). On "Add" we map the
-// square frame back to source pixels and crop via expo-image-manipulator.
+// 3:4 frame back to source pixels and crop via expo-image-manipulator.
 //
 // Deps already in the app: react-native-gesture-handler, react-native-reanimated.
 // New dep: expo-image-manipulator (used inside lib/filterPhotos.cropAndPersist).
@@ -22,17 +22,23 @@ import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { useTheme } from '../theme/theme';
 import { BackButton, PillButton } from './HeaderBits';
-import { baseScaleFor, clampPan, computeCropRect } from '../lib/cropmath';
+import { baseScaleFor, clampPan, computeCropRect, frameHeightFor, fitWidthScale } from '../lib/cropmath';
 import { cropAndPersist } from '../lib/filterPhotos';
 
 const MAX_SCALE = 6;
+// Users can zoom OUT below the auto-fit (cover) start to see the whole photo,
+// accepting bars in the 3:4 frame if they choose. Floor is a small fraction so
+// even a big image can be pulled fully into view. The auto-fit start still fills
+// the frame; this only sets how far OUT they can pull from there.
+const MIN_SCALE = 0.5;
 
 export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
   const t = useTheme();
   const s = makeStyles(t);
 
-  const [frame, setFrame] = useState(0);   // square crop side (screen px)
+  const [frame, setFrame] = useState(0);   // crop frame WIDTH (screen px); height = 3:4
   const [dims, setDims] = useState(null);  // natural image size { w, h }
+  const [minScale, setMinScale] = useState(1); // scale that covers the 3:4 frame
   const [busy, setBusy] = useState(false);
 
   const scale = useSharedValue(1);
@@ -45,7 +51,6 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
   // Reset transform + (re)load natural dimensions whenever a new photo opens.
   useEffect(() => {
     if (!asset) { setDims(null); return; }
-    scale.value = 1; savedScale.value = 1;
     tx.value = 0; ty.value = 0; savedTx.value = 0; savedTy.value = 0;
     if (asset.width && asset.height) {
       setDims({ w: asset.width, h: asset.height });
@@ -53,6 +58,19 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
       Image.getSize(asset.uri, (w, h) => setDims({ w, h }), () => setDims({ w: 1, h: 1 }));
     }
   }, [asset?.uri]);
+
+  // Once we know the image size AND the frame, START at fit-WIDTH: the full
+  // width of the photo is visible (nothing cut off the sides), with bars top/
+  // bottom for square/tall photos. The user pans/zooms freely from here; they
+  // can zoom out further (MIN_SCALE) or in (MAX_SCALE). On save, whatever is in
+  // the 3:4 frame is captured — the user's choice, not an assumed center crop.
+  useEffect(() => {
+    if (!dims || !frame) return;
+    const fw = fitWidthScale(dims.w, dims.h, frame);
+    setMinScale(fw);
+    scale.value = fw; savedScale.value = fw;
+    tx.value = 0; ty.value = 0; savedTx.value = 0; savedTy.value = 0;
+  }, [dims, frame]);
 
   const settle = () => {
     if (!dims || !frame) return;
@@ -64,7 +82,7 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
   };
 
   const pinch = Gesture.Pinch()
-    .onUpdate(e => { scale.value = Math.min(MAX_SCALE, Math.max(1, savedScale.value * e.scale)); })
+    .onUpdate(e => { scale.value = Math.min(MAX_SCALE, Math.max(MIN_SCALE, savedScale.value * e.scale)); })
     .onEnd(() => { runOnJS(settle)(); });
 
   const pan = Gesture.Pan()
@@ -108,13 +126,18 @@ export default function PhotoCropper({ visible, asset, onCancel, onDone }) {
             style={s.area}
             onLayout={e => {
               const { width, height } = e.nativeEvent.layout;
-              setFrame(Math.max(0, Math.min(width, height) - 36));
+              // Fit a 3:4 PORTRAIT frame: width bounded by area width, and its
+              // derived height (w*4/3) bounded by area height. Pad by 36.
+              const availW = Math.max(0, width - 36);
+              const availH = Math.max(0, height - 36);
+              const wByHeight = (availH * 3) / 4;
+              setFrame(Math.round(Math.min(availW, wByHeight)));
             }}
           >
             {asset && dims && frame > 0 && (
-              <View style={[s.frame, { width: frame, height: frame }]}>
+              <View style={[s.frame, { width: frame, height: frameHeightFor(frame) }]}>
                 <GestureDetector gesture={composed}>
-                  <Animated.View style={[s.gestureLayer, { width: frame, height: frame }]}>
+                  <Animated.View style={[s.gestureLayer, { width: frame, height: frameHeightFor(frame) }]}>
                     <Animated.Image
                       source={{ uri: asset.uri }}
                       style={[{ width: dispW, height: dispH }, imgStyle]}

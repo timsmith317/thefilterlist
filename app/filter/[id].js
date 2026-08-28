@@ -29,8 +29,8 @@ import { useTheme } from '../../theme/theme';
 import { BackButton, PillButton } from '../../components/HeaderBits';
 import PhotoStrip from '../../components/PhotoStrip';
 import PhotoCropper from '../../components/PhotoCropper';
-import PhotoViewerModal from '../../components/PhotoViewerModal';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
+import PhotoViewerModal from '../../components/PhotoViewerModal';
 import IntervalField from '../../components/IntervalField';
 import { loadData, saveData, updateFilter, deleteFilter, devicesUsingFilter, isFilterLow, addFilterPhoto, removeFilterPhoto, FILTER_TYPES, MAX_FILTER_PHOTOS, DEFAULT_INTERVAL_DAYS } from '../../data/store';
 import { intervalToDays, daysToInterval, INTERVAL_UNITS } from '../../lib/interval';
@@ -52,10 +52,10 @@ export default function FilterDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [data, setData] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(null);
   const [cropAsset, setCropAsset] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerStart, setViewerStart] = useState(0);
   const s = makeStyles(t);
@@ -140,19 +140,31 @@ export default function FilterDetail() {
       Alert.alert('Limit reached', `You can add up to ${MAX_FILTER_PHOTOS} photos per filter.`);
       return;
     }
-    if (source === 'camera') { setCameraOpen(true); return; }
+    if (source === 'camera') {
+      setCameraOpen(true);
+      return;
+    }
+    // Library import → asset → custom cropper.
     const asset = await pickFromLibrary();
     if (!asset) return;
     setCropAsset(asset);
   };
 
-  const onCroppedPhoto = async (uri) => {
+  // Camera modal captured a photo → hand its asset to the cropper.
+  const onCameraCaptured = (asset) => {
+    setCameraOpen(false);
+    if (asset) setCropAsset(asset);
+  };
+
+  // Cropper produced a stored filename → add to the filter.
+  const onCroppedPhoto = async (stored) => {
     setCropAsset(null);
-    if (!uri) return;
-    const next = addFilterPhoto(data, filter.id, uri);
+    if (!stored) return;
+    const next = addFilterPhoto(data, filter.id, stored);
     setData(next);
     await saveData(next);
   };
+
 
   const onSaveToPhotos = async (uri) => {
     const ok = await saveToPhotos(uri);
@@ -337,13 +349,6 @@ export default function FilterDetail() {
         )}
       </KeyboardAwareScrollView>
 
-      <PhotoCropper
-        visible={!!cropAsset}
-        asset={cropAsset}
-        onCancel={() => setCropAsset(null)}
-        onDone={onCroppedPhoto}
-      />
-
       <PhotoViewerModal
         visible={viewerOpen}
         photos={filter.photos || []}
@@ -351,11 +356,19 @@ export default function FilterDetail() {
         onClose={() => setViewerOpen(false)}
       />
 
+          <PhotoCropper
+        visible={!!cropAsset}
+        asset={cropAsset}
+        onCancel={() => setCropAsset(null)}
+        onDone={onCroppedPhoto}
+      />
+
       <CameraCaptureModal
         visible={cameraOpen}
         onCancel={() => setCameraOpen(false)}
-        onCapture={(asset) => { setCameraOpen(false); setCropAsset(asset); }}
+        onCapture={onCameraCaptured}
       />
+
     </SafeAreaView>
   );
 }
@@ -395,8 +408,6 @@ function makeStyles(t) {
 
     hint: { fontSize: t.uit(12), color: t.muted, marginTop: 8, paddingLeft: 16 },
 
-    // Read-only photo thumbnails (view mode). Match PhotoStrip's filled slot:
-    // square, card fill, thin line border, contain so the whole photo shows.
     // Read-only photo thumbnails (view mode), laid out on the same 3-column grid
     // as the edit strip: photos fill from the left, invisible spacers hold the
     // empty columns, so the outer photos align with the fields above.
@@ -407,8 +418,8 @@ function makeStyles(t) {
     thumbRow: t.isTablet
       ? { flexDirection: 'row', justifyContent: 'flex-start', gap: t.ui(48), paddingLeft: 16 }
       : { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 16 },
-    thumb: { width: t.ui(96), height: t.ui(96), borderRadius: t.ui(14), overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
-    thumbSpacer: t.isTablet ? { width: 0, height: 0 } : { width: 96, height: 96 },
+    thumb: { width: t.ui(96), height: t.ui(128), borderRadius: t.ui(14), overflow: 'hidden', backgroundColor: t.card, borderWidth: 1, borderColor: t.line },
+    thumbSpacer: t.isTablet ? { width: 0, height: 0 } : { width: 96, height: 128 },
     thumbImg: { width: '100%', height: '100%', resizeMode: 'contain' },
 
     usedBox: { backgroundColor: t.card, borderRadius: 14, borderWidth: 1, borderColor: t.line, paddingHorizontal: 14 },
