@@ -1,0 +1,59 @@
+# File: wrangler.toml → ~/Projects/thefilterlist/worker/wrangler.toml
+#
+# The Filter List — sync Worker.
+#
+# Deploy from ~/Projects/thefilterlist/worker/ (a separate wrangler project from
+# the app itself; the app has no wrangler config).
+
+name = "thefilterlist-sync"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+preview_urls = false
+
+# D1 — the record store. Already created; this is the real id.
+#
+# `binding` is the name the CODE uses — env.DB in src/sync.js, src/photos.js and
+# src/auth.js. `wrangler d1 create` suggests naming the binding after the
+# database ("thefilterlist"); do NOT follow that here. Renaming the binding
+# without renaming every env.DB reference produces a Worker that deploys
+# cleanly and then throws on the first request, which is a slow way to find
+# a one-word mistake.
+[[d1_databases]]
+binding = "DB"
+database_name = "thefilterlist"
+database_id = "95b0334c-b6cb-4f0d-8368-c5fb4f9c0e95"
+
+# R2 — photo bytes. Create once (requires R2 to be enabled on the account first;
+# `npx wrangler r2 bucket list` tells you whether it is):
+#   npx wrangler r2 bucket create thefilterlist-photos
+#
+# NOTE: the Worker reaches R2 through THIS BINDING, not through the S3 API. No
+# account id, no S3 API token, no access keys. The "S3 API" panel in the R2
+# dashboard is for external clients; using it here would mean a second
+# credential to store and protect for no benefit. Leave it alone.
+#
+# LEAVE THIS BUCKET PRIVATE. Do not attach a public r2.dev URL or a custom
+# domain. Photo filenames are timestamps, which are guessable, so a public
+# bucket would let anyone enumerate other people's photos. All access goes
+# through the Worker, which checks the bearer token first.
+#
+# Also leave object versioning OFF: with versioning on, a deleted photo survives
+# as a noncurrent version, which would make the account-deletion promise false.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "thefilterlist-photos"
+
+# Secrets — set with `npx wrangler secret put NAME`, never committed:
+#   SYNC_TOKEN       the bearer token the app sends (v1, single account)
+#   SYNC_ACCOUNT_ID  the account id that token maps to (v1, single account)
+#
+# In v2 both disappear: the token becomes a per-user credential minted after
+# Sign in with Apple / Google, and the account id comes from the accounts table.
+# See src/auth.js — that swap is meant to touch one file.
+
+[observability]
+enabled = true
+
+# Deliberately NOT logging request bodies. Cloudflare's own request logs keep
+# metadata (timestamps, status, IP), which is normal and disclosable, but record
+# bodies and photo filenames must never reach a log line.

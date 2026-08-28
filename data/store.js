@@ -1,3 +1,5 @@
+// File: data/store.js → ~/Projects/thefilterlist/data/store.js
+//
 // data/store.js — The Filter List data layer (v2).
 // Model: Asset -> Device -> Stage(s) -> Filter. (Assets are the one org dimension.)
 //
@@ -48,6 +50,99 @@ export const KEY = 'thefilterlist.data.v5';
 const LEGACY_KEY_V1 = 'thefilterlist.data.v1';
 
 export const MAX_FILTER_PHOTOS = 3;
+
+// ===========================================================================
+// SYNC FOUNDATION (schemaVersion 4)
+// ===========================================================================
+// Everything here exists so a future sync engine can answer two questions about
+// any record: "when did this last change?" and "was this deleted?". No network
+// code depends on it yet, and none of it changes app behaviour.
+//
+// WHY updatedAt: merging two devices means picking a winner per record. Without
+// a per-record timestamp the only options are "whole document wins" (which
+// silently discards the loser's unrelated edits) or asking the user, which is
+// unusable. Last-write-wins per record needs exactly one number per record.
+//
+// WHY A TOMBSTONE ARRAY, not a deletedAt flag on the record: a flag would mean
+// every read path in this file had to filter deleted records out, and missing
+// one resurrects deleted filters on the Due Soon screen. The array keeps deletes
+// as real removals, so every read helper is untouched. The cost is that
+// tombstones accumulate — see pruneTombstones.
+//
+// A delete that never produces a tombstone is a delete that will come BACK from
+// the other device on the next sync, because the other device still has the
+// record and this one has no evidence it was removed. That is why
+// clearStarterData tombstones too, even though it feels like a local cleanup.
+export const SCHEMA_VERSION = 4;
+
+// How long tombstones are kept. Must comfortably exceed the longest plausible
+// gap between a device's syncs — a device offline longer than this would
+// resurrect records it deleted. A year is generous for an app people open a few
+// times a year.
+export const TOMBSTONE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+function nowMs() { return Date.now(); }
+
+// Record IDs. Previously bare `Date.now()`, which two offline devices could
+// collide on in the same millisecond — the merge would then treat two different
+// records as one. The random suffix makes that vanishingly unlikely. Existing
+// IDs keep working untouched; only newly created records get the suffix.
+function newId(prefix) {
+  return prefix + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+}
+
+// Mark a record as changed now. Applied to the record being mutated, never to
+// its siblings — stamping untouched records would make them win merges they
+// should lose.
+function stamp(record) {
+  return { ...record, updatedAt: nowMs() };
+}
+
+// Record a deletion so it can propagate. Replaces any prior tombstone for the
+// same record so re-deleting refreshes the timestamp rather than duplicating.
+function addTombstone(data, type, id) {
+  if (!id) return data;
+  const rest = (data.tombstones || []).filter(t => !(t.type === type && t.id === id));
+  return { ...data, tombstones: [...rest, { type, id, deletedAt: nowMs() }] };
+}
+
+function addTombstones(data, type, ids) {
+  return (ids || []).reduce((d, id) => addTombstone(d, type, id), data);
+}
+
+// Drop tombstones older than the TTL. Called on load, so it costs nothing at
+// mutation time.
+export function pruneTombstones(data) {
+  const list = data && data.tombstones;
+  if (!Array.isArray(list) || list.length === 0) return data;
+  const cutoff = nowMs() - TOMBSTONE_TTL_MS;
+  const kept = list.filter(t => t && typeof t.deletedAt === 'number' && t.deletedAt >= cutoff);
+  return kept.length === list.length ? data : { ...data, tombstones: kept };
+}
+
+// v3 -> v4. Stamps every existing record and adds the tombstone array. Existing
+// records all get the SAME timestamp, which is correct: before this migration we
+// genuinely don't know when any of them last changed, and the first device to
+// sync should simply seed the server.
+function migrateSyncFields(data) {
+  if (!data) return data;
+  if (data.schemaVersion >= SCHEMA_VERSION && Array.isArray(data.tombstones)) return data;
+  const t = nowMs();
+  const stampAll = (list) => (Array.isArray(list) ? list : []).map(
+    r => (r && typeof r.updatedAt === 'number') ? r : { ...r, updatedAt: t }
+  );
+  const settings = { ...(data.settings || {}) };
+  if (typeof settings.updatedAt !== 'number') settings.updatedAt = t;
+  return {
+    ...data,
+    schemaVersion: SCHEMA_VERSION,
+    assets: stampAll(data.assets),
+    filters: stampAll(data.filters),
+    devices: stampAll(data.devices),
+    settings,
+    tombstones: Array.isArray(data.tombstones) ? data.tombstones : [],
+  };
+}
 
 // Default replacement interval (days) for a brand-new filter or a filterless stage.
 export const DEFAULT_INTERVAL_DAYS = 90;
@@ -444,6 +539,36 @@ function migrateReminders(data) {
   };
 }
 
+// The migration pipeline, in order. Previously this was a single deeply nested
+// call repeated in three places — easy to get out of step, and impossible to
+// read. Same functions, same order, one definition.
+function runMigrations(raw) {
+  let d = raw;
+  d = migrateDeviceFilterRename(d);
+  d = migrateIdPrefixes(d);
+  d = migrateReminders(d);
+  d = migrateDeviceStages(d);
+  d = migrateFilterIntervals(d);
+  d = migrateFilterTypes(d);
+  d = migrateDeviceManual(d);
+  d = migratePhotoPaths(d);
+  d = ensureDefaultAssets(d);
+  d = migrateSyncFields(d);   // schemaVersion 4: updatedAt + tombstones
+  return d;
+}
+
+// Seeded data is already in the current shape, so it skips the legacy steps.
+function runSeedMigrations(raw) {
+  let d = raw;
+  d = migrateDeviceStages(d);
+  d = migrateFilterIntervals(d);
+  d = migrateFilterTypes(d);
+  d = migrateDeviceManual(d);
+  d = ensureDefaultAssets(d);
+  d = migrateSyncFields(d);
+  return d;
+}
+
 export async function loadData() {
   try {
     const v2 = await AsyncStorage.getItem(KEY);
@@ -452,19 +577,20 @@ export async function loadData() {
       // Defensive: ensure filters have photos:[] (covers users who saved before this field existed)
       if (parsed.filters) parsed.filters = parsed.filters.map(p => ({ ...p, photos: p.photos || [] }));
       const starter = parsed.__starter; // preserve the sample-data marker across migrations
-      const out = ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(parsed)))))))));
+      const out = pruneTombstones(runMigrations(parsed));
       if (starter) out.__starter = starter;
       return out;
     }
     const v1raw = await AsyncStorage.getItem(LEGACY_KEY_V1);
     if (v1raw) {
       const v1 = JSON.parse(v1raw);
-      const migrated = ensureDefaultAssets(migratePhotoPaths(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(migrateReminders(migrateIdPrefixes(migrateDeviceFilterRename(migrateV1toV2(v1))))))))));
+      const migrated = runMigrations(migrateV1toV2(v1));
+
       await saveData(migrated);
       return migrated;
     }
   } catch (e) { console.warn('loadData failed', e); }
-  const fresh = ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(seed())))));
+  const fresh = runSeedMigrations(seed());
   fresh.__starter = buildStarterMarker(fresh); // arm "Delete Sample Data" — fresh install only
   await saveData(fresh);
   return fresh;
@@ -483,7 +609,7 @@ export async function saveData(data) {
 }
 
 export async function resetToSeed() {
-  const fresh = ensureDefaultAssets(migrateDeviceManual(migrateFilterTypes(migrateFilterIntervals(migrateDeviceStages(seed())))));
+  const fresh = runSeedMigrations(seed());
   fresh.__starter = buildStarterMarker(fresh);
   await saveData(fresh);
   return fresh;
@@ -581,7 +707,12 @@ export async function clearStarterData() {
   for (const d of keptDevices) for (const s of (d.stages || [])) if (s.filterId) usedByKept.add(s.filterId);
   const removeFilters = new Set(pf.filter(id => !usedByKept.has(id)));
   const keptFilters = (data.filters || []).filter(f => !removeFilters.has(f.id));
-  const next = { ...data, devices: keptDevices, filters: keptFilters };
+  // Tombstone the cleared seed items. Without this, a second device that still
+  // has the sample data would push it back on the next sync and "Delete Sample
+  // Data" would appear not to have worked.
+  let next = { ...data, devices: keptDevices, filters: keptFilters };
+  next = addTombstones(next, 'device', Array.from(removeDevices));
+  next = addTombstones(next, 'filter', Array.from(removeFilters));
   delete next.__starter;
   await saveData(next);
   return next;
@@ -765,7 +896,7 @@ export function markReplaced(data, deviceId, replacedDate, stageIds) {
     if (targetIds.has(s.id) && s.filterId) consumed[s.filterId] = (consumed[s.filterId] || 0) + 1;
   });
   const nextFilters = (data.filters || []).map(p =>
-    consumed[p.id] ? { ...p, onHand: Math.max(0, (p.onHand || 0) - consumed[p.id]) } : p
+    consumed[p.id] ? stamp({ ...p, onHand: Math.max(0, (p.onHand || 0) - consumed[p.id]) }) : p
   );
 
   const nextStages = stages.map(s =>
@@ -774,13 +905,13 @@ export function markReplaced(data, deviceId, replacedDate, stageIds) {
 
   return {
     ...data,
-    devices: data.devices.map(x => x.id === deviceId ? withMirror({ ...x, stages: nextStages }) : x),
+    devices: data.devices.map(x => x.id === deviceId ? stamp(withMirror({ ...x, stages: nextStages })) : x),
     filters: nextFilters,
   };
 }
 
 export function addDevice(data, device) {
-  const id = 'd_' + Date.now();
+  const id = newId('d_');
   // Accept either an incoming `stages` array or the legacy single-filter shape
   // (intervalDays/lastReplaced/filterId) and normalize to stages + mirror.
   const incomingStages = Array.isArray(device.stages) && device.stages.length > 0
@@ -791,7 +922,7 @@ export function addDevice(data, device) {
         filterId: device.filterId,
       })];
   const { intervalDays, lastReplaced, filterId, photo, stages, ...rest } = device;
-  const f = withMirror({ ...rest, id, stages: incomingStages });
+  const f = stamp(withMirror({ ...rest, id, stages: incomingStages }));
   return { ...data, devices: [...data.devices, f] };
 }
 
@@ -816,27 +947,28 @@ export function updateDevice(data, deviceId, patch) {
       } else if (Array.isArray(patch.stages)) {
         next = { ...next, stages: patch.stages.map((s, i) => makeStage(f.id, i, s)) };
       }
-      return withMirror(next);
+      return stamp(withMirror(next));
     }),
   };
 }
 
 export function deleteDevice(data, deviceId) {
-  return { ...data, devices: data.devices.filter(f => f.id !== deviceId) };
+  const next = { ...data, devices: data.devices.filter(f => f.id !== deviceId) };
+  return addTombstone(next, 'device', deviceId);
 }
 export function addAsset(data, asset) {
   const maxOrder = (data.assets || []).reduce((m, a) => Math.max(m, a.order || 0), -1);
-  return { ...data, assets: [...data.assets, { archived: false, order: maxOrder + 1, ...asset, id: 'a_' + Date.now() }] };
+  return { ...data, assets: [...data.assets, stamp({ archived: false, order: maxOrder + 1, ...asset, id: newId('a_') })] };
 }
 export function setAssetArchived(data, assetId, archived) {
-  return { ...data, assets: data.assets.map(a => a.id === assetId ? { ...a, archived } : a) };
+  return { ...data, assets: data.assets.map(a => a.id === assetId ? stamp({ ...a, archived }) : a) };
 }
 export function addFilter(data, filter) {
-  const id = 'f_' + Date.now();
-  return { ...data, filters: [...(data.filters || []), { id, name: '', type: 'other', sku: '', reorderUrl: '', photos: [], onHand: 0, lowStockThreshold: 1, intervalDays: DEFAULT_INTERVAL_DAYS, ...filter }] };
+  const id = newId('f_');
+  return { ...data, filters: [...(data.filters || []), stamp({ id, name: '', type: 'other', sku: '', reorderUrl: '', photos: [], onHand: 0, lowStockThreshold: 1, intervalDays: DEFAULT_INTERVAL_DAYS, ...filter })] };
 }
 export function updateFilter(data, filterId, patch) {
-  return { ...data, filters: (data.filters || []).map(p => p.id === filterId ? { ...p, ...patch } : p) };
+  return { ...data, filters: (data.filters || []).map(p => p.id === filterId ? stamp({ ...p, ...patch }) : p) };
 }
 
 // Delete a filter from the catalog and unlink it from every stage that used it.
@@ -845,16 +977,24 @@ export function updateFilter(data, filterId, patch) {
 export function deleteFilter(data, filterId) {
   const gone = getFilter(data, filterId);
   const fallbackIv = gone && typeof gone.intervalDays === 'number' ? gone.intervalDays : DEFAULT_INTERVAL_DAYS;
-  return {
+  // Only devices that actually referenced this filter are modified, so only
+  // those get stamped. Stamping untouched devices would make them win merges
+  // against edits made on another device that this one never saw.
+  const next = {
     ...data,
     filters: (data.filters || []).filter(p => p.id !== filterId),
-    devices: data.devices.map(f => withMirror({
-      ...f,
-      stages: deviceStages(f).map(s =>
-        s.filterId === filterId ? { ...s, filterId: null, intervalDays: fallbackIv } : s
-      ),
-    })),
+    devices: data.devices.map(f => {
+      const stages = deviceStages(f);
+      if (!stages.some(st => st.filterId === filterId)) return f;
+      return stamp(withMirror({
+        ...f,
+        stages: stages.map(st =>
+          st.filterId === filterId ? { ...st, filterId: null, intervalDays: fallbackIv } : st
+        ),
+      }));
+    }),
   };
+  return addTombstone(next, 'filter', filterId);
 }
 
 // Photo helpers — pure mutations on a Filter's photos array. Stored values are
@@ -867,7 +1007,7 @@ export function addFilterPhoto(data, filterId, uri) {
     filters: (data.filters || []).map(p => {
       if (p.id !== filterId) return p;
       const next = [...(p.photos || []), rel].slice(0, MAX_FILTER_PHOTOS);
-      return { ...p, photos: next };
+      return stamp({ ...p, photos: next });
     }),
   };
 }
@@ -877,22 +1017,22 @@ export function removeFilterPhoto(data, filterId, index) {
     filters: (data.filters || []).map(p => {
       if (p.id !== filterId) return p;
       const next = (p.photos || []).filter((_, i) => i !== index);
-      return { ...p, photos: next };
+      return stamp({ ...p, photos: next });
     }),
   };
 }
 
 // Settings helpers — shallow merge into settings or settings.reminders.
 export function updateSettings(data, patch) {
-  return { ...data, settings: { ...(data.settings || {}), ...patch } };
+  return { ...data, settings: stamp({ ...(data.settings || {}), ...patch }) };
 }
 export function updateReminders(data, patch) {
   return {
     ...data,
-    settings: {
+    settings: stamp({
       ...(data.settings || {}),
       reminders: { ...((data.settings || {}).reminders || {}), ...patch },
-    },
+    }),
   };
 }
 
@@ -913,7 +1053,7 @@ export function updateAsset(data, assetId, patch) {
   return {
     ...data,
     assets: (data.assets || []).map(a =>
-      a.id === assetId ? { ...a, ...patch } : a
+      a.id === assetId ? stamp({ ...a, ...patch }) : a
     ),
   };
 }
@@ -930,12 +1070,12 @@ export function reorderAssets(data, idsInOrder) {
   const seen = new Set();
   const reordered = [];
   idsInOrder.forEach((id, i) => {
-    if (byId[id]) { reordered.push({ ...byId[id], order: i }); seen.add(id); }
+    if (byId[id]) { reordered.push(stamp({ ...byId[id], order: i })); seen.add(id); }
   });
   assets
     .filter(a => !seen.has(a.id))
     .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .forEach(a => reordered.push({ ...a, order: reordered.length }));
+    .forEach(a => reordered.push(stamp({ ...a, order: reordered.length })));
   return { ...data, assets: reordered };
 }
 
@@ -943,9 +1083,13 @@ export function reorderAssets(data, idsInOrder) {
 // protected defaults can't be deleted. Filters are NOT touched (shared catalog).
 export function deleteAsset(data, assetId) {
   if (!canDeleteAsset(assetId)) return data;
-  return {
+  // Cascading device deletes need their OWN tombstones — the other device has
+  // no way to infer them from the asset's tombstone alone.
+  const removedDeviceIds = (data.devices || []).filter(f => f.assetId === assetId).map(f => f.id);
+  const next = {
     ...data,
     assets: (data.assets || []).filter(a => a.id !== assetId),
     devices: (data.devices || []).filter(f => f.assetId !== assetId),
   };
+  return addTombstones(addTombstone(next, 'asset', assetId), 'device', removedDeviceIds);
 }
